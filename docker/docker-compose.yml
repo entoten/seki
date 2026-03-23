@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: seki
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
+      POSTGRES_DB: seki
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - seki-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seki -d seki"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  seki:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./seki.yaml:/app/seki.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - seki-net
+    environment:
+      - SEKI_CONFIG=/app/seki.yaml
+
+volumes:
+  pgdata:
+
+networks:
+  seki-net:
+    driver: bridge

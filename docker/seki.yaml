@@ -1,0 +1,11 @@
+server:
+  address: ":8080"
+  issuer: "http://localhost:8080"
+
+database:
+  driver: postgres
+  dsn: "postgres://seki:secret@postgres:5432/seki?sslmode=disable"
+
+signing:
+  algorithm: EdDSA
+  key_file: /app/keys/signing.key

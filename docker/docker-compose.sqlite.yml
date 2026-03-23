@@ -1,0 +1,15 @@
+services:
+  seki:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./seki.yaml:/app/seki.yaml:ro
+      - seki-data:/app/data
+    environment:
+      - SEKI_CONFIG=/app/seki.yaml
+
+volumes:
+  seki-data:
