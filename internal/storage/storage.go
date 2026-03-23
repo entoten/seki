@@ -20,6 +20,7 @@ type Storage interface {
 	AuditStore
 	AuthCodeStore
 	RefreshTokenStore
+	CredentialStore
 	Migrate() error
 	Close() error
 	Ping(ctx context.Context) error
@@ -64,6 +65,19 @@ type AuthCodeStore interface {
 	CreateAuthCode(ctx context.Context, code *AuthCode) error
 	GetAuthCode(ctx context.Context, code string) (*AuthCode, error)
 	DeleteAuthCode(ctx context.Context, code string) error
+}
+
+// CredentialStore defines operations on user credentials (passkey, totp, password).
+type CredentialStore interface {
+	CreateCredential(ctx context.Context, cred *Credential) error
+	GetCredential(ctx context.Context, id string) (*Credential, error)
+	GetCredentialByCredentialID(ctx context.Context, credentialID []byte) (*Credential, error)
+	GetCredentialsByUserAndType(ctx context.Context, userID string, credType string) ([]*Credential, error)
+	ListCredentialsByUser(ctx context.Context, userID string, credType string) ([]*Credential, error)
+	UpdateCredential(ctx context.Context, cred *Credential) error
+	UpdateCredentialSignCount(ctx context.Context, id string, signCount uint32, lastUsedAt time.Time) error
+	DeleteCredential(ctx context.Context, id string) error
+	DeleteCredentialsByUserAndType(ctx context.Context, userID string, credType string) error
 }
 
 // RefreshTokenStore defines operations on OAuth2 refresh tokens.

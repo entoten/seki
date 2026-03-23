@@ -44,6 +44,7 @@ func (s *Store) Migrate() error {
 		"migrations/001_init.up.sql",
 		"migrations/002_authorization_codes.up.sql",
 		"migrations/003_refresh_tokens.up.sql",
+		"migrations/004_credentials_webauthn.up.sql",
 	}
 	for _, name := range migrations {
 		data, err := migrationsFS.ReadFile(name)
@@ -515,6 +516,145 @@ func (s *Store) DeleteRefreshTokensByUserID(ctx context.Context, userID string) 
 		return 0, fmt.Errorf("postgres: delete refresh tokens by user: %w", err)
 	}
 	return ct.RowsAffected(), nil
+}
+
+// ---------------------------------------------------------------------------
+// CredentialStore
+// ---------------------------------------------------------------------------
+
+func (s *Store) CreateCredential(ctx context.Context, cred *storage.Credential) error {
+	now := cred.CreatedAt.UTC()
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO credentials (id, user_id, type, credential_id, public_key, attestation_type, aaguid, sign_count, display_name, last_used_at, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		cred.ID, cred.UserID, cred.Type, cred.CredentialID, cred.PublicKey,
+		cred.AttestationType, cred.AAGUID, cred.SignCount, cred.DisplayName,
+		cred.LastUsedAt, now,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("postgres: create credential: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetCredential(ctx context.Context, id string) (*storage.Credential, error) {
+	row := s.pool.QueryRow(ctx,
+		`SELECT id, user_id, type, credential_id, public_key, attestation_type, aaguid, sign_count, display_name, last_used_at, created_at
+		 FROM credentials WHERE id = $1`, id)
+	return scanCredentialPgx(row)
+}
+
+func (s *Store) GetCredentialByCredentialID(ctx context.Context, credentialID []byte) (*storage.Credential, error) {
+	row := s.pool.QueryRow(ctx,
+		`SELECT id, user_id, type, credential_id, public_key, attestation_type, aaguid, sign_count, display_name, last_used_at, created_at
+		 FROM credentials WHERE credential_id = $1`, credentialID)
+	return scanCredentialPgx(row)
+}
+
+func (s *Store) GetCredentialsByUserAndType(ctx context.Context, userID string, credType string) ([]*storage.Credential, error) {
+	return s.ListCredentialsByUser(ctx, userID, credType)
+}
+
+func (s *Store) ListCredentialsByUser(ctx context.Context, userID string, credType string) ([]*storage.Credential, error) {
+	var rows pgx.Rows
+	var err error
+	if credType != "" {
+		rows, err = s.pool.Query(ctx,
+			`SELECT id, user_id, type, credential_id, public_key, attestation_type, aaguid, sign_count, display_name, last_used_at, created_at
+			 FROM credentials WHERE user_id = $1 AND type = $2 ORDER BY created_at ASC`,
+			userID, credType,
+		)
+	} else {
+		rows, err = s.pool.Query(ctx,
+			`SELECT id, user_id, type, credential_id, public_key, attestation_type, aaguid, sign_count, display_name, last_used_at, created_at
+			 FROM credentials WHERE user_id = $1 ORDER BY created_at ASC`,
+			userID,
+		)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("postgres: list credentials: %w", err)
+	}
+	defer rows.Close()
+
+	var creds []*storage.Credential
+	for rows.Next() {
+		var c storage.Credential
+		err := rows.Scan(&c.ID, &c.UserID, &c.Type, &c.CredentialID, &c.PublicKey,
+			&c.AttestationType, &c.AAGUID, &c.SignCount, &c.DisplayName,
+			&c.LastUsedAt, &c.CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("postgres: scan credential: %w", err)
+		}
+		creds = append(creds, &c)
+	}
+	return creds, rows.Err()
+}
+
+func (s *Store) UpdateCredential(ctx context.Context, cred *storage.Credential) error {
+	now := time.Now().UTC()
+	ct, err := s.pool.Exec(ctx,
+		`UPDATE credentials SET type = $1, credential_id = $2, public_key = $3, attestation_type = $4, aaguid = $5, sign_count = $6, display_name = $7, last_used_at = $8, updated_at = $9 WHERE id = $10`,
+		cred.Type, cred.CredentialID, cred.PublicKey,
+		cred.AttestationType, cred.AAGUID, cred.SignCount,
+		cred.DisplayName, cred.LastUsedAt, now, cred.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("postgres: update credential: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) UpdateCredentialSignCount(ctx context.Context, id string, signCount uint32, lastUsedAt time.Time) error {
+	ct, err := s.pool.Exec(ctx,
+		`UPDATE credentials SET sign_count = $1, last_used_at = $2 WHERE id = $3`,
+		signCount, lastUsedAt.UTC(), id,
+	)
+	if err != nil {
+		return fmt.Errorf("postgres: update credential sign count: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DeleteCredential(ctx context.Context, id string) error {
+	ct, err := s.pool.Exec(ctx, `DELETE FROM credentials WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("postgres: delete credential: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DeleteCredentialsByUserAndType(ctx context.Context, userID string, credType string) error {
+	_, err := s.pool.Exec(ctx, `DELETE FROM credentials WHERE user_id = $1 AND type = $2`, userID, credType)
+	if err != nil {
+		return fmt.Errorf("postgres: delete credentials by user and type: %w", err)
+	}
+	return nil
+}
+
+func scanCredentialPgx(row pgx.Row) (*storage.Credential, error) {
+	var c storage.Credential
+	err := row.Scan(&c.ID, &c.UserID, &c.Type, &c.CredentialID, &c.PublicKey,
+		&c.AttestationType, &c.AAGUID, &c.SignCount, &c.DisplayName,
+		&c.LastUsedAt, &c.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("postgres: scan credential: %w", err)
+	}
+	return &c, nil
 }
 
 // ---------------------------------------------------------------------------

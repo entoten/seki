@@ -479,6 +479,160 @@ func (s *Store) DeleteRefreshTokensByUserID(ctx context.Context, userID string) 
 }
 
 // ---------------------------------------------------------------------------
+// CredentialStore
+// ---------------------------------------------------------------------------
+
+// credentialColumns is the column list used for credential SELECT queries.
+const credentialColumns = `id, user_id, type, secret, metadata, credential_id, public_key, attestation_type, aaguid, sign_count, display_name, last_used_at, created_at, updated_at`
+
+func (s *Store) CreateCredential(ctx context.Context, cred *storage.Credential) error {
+	meta := normalizeJSON(cred.Metadata)
+	now := timeStr(cred.CreatedAt)
+	var lastUsedStr *string
+	if cred.LastUsedAt != nil {
+		v := timeStr(*cred.LastUsedAt)
+		lastUsedStr = &v
+	}
+	secret := cred.Secret
+	if secret == nil {
+		secret = []byte{}
+	}
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO credentials (id, user_id, type, secret, metadata, credential_id, public_key, attestation_type, aaguid, sign_count, display_name, last_used_at, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		cred.ID, cred.UserID, cred.Type, secret, meta,
+		cred.CredentialID, cred.PublicKey,
+		cred.AttestationType, cred.AAGUID, cred.SignCount, cred.DisplayName,
+		lastUsedStr, now, now,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("sqlite: create credential: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetCredential(ctx context.Context, id string) (*storage.Credential, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT `+credentialColumns+` FROM credentials WHERE id = ?`, id)
+	return scanCredentialRow(row)
+}
+
+func (s *Store) GetCredentialByCredentialID(ctx context.Context, credentialID []byte) (*storage.Credential, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT `+credentialColumns+` FROM credentials WHERE credential_id = ?`, credentialID)
+	return scanCredentialRow(row)
+}
+
+func (s *Store) GetCredentialsByUserAndType(ctx context.Context, userID string, credType string) ([]*storage.Credential, error) {
+	return s.ListCredentialsByUser(ctx, userID, credType)
+}
+
+func (s *Store) ListCredentialsByUser(ctx context.Context, userID string, credType string) ([]*storage.Credential, error) {
+	var rows *sql.Rows
+	var err error
+	if credType != "" {
+		rows, err = s.db.QueryContext(ctx,
+			`SELECT `+credentialColumns+` FROM credentials WHERE user_id = ? AND type = ? ORDER BY created_at ASC`,
+			userID, credType,
+		)
+	} else {
+		rows, err = s.db.QueryContext(ctx,
+			`SELECT `+credentialColumns+` FROM credentials WHERE user_id = ? ORDER BY created_at ASC`,
+			userID,
+		)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("sqlite: list credentials: %w", err)
+	}
+	defer rows.Close()
+
+	var creds []*storage.Credential
+	for rows.Next() {
+		c, err := scanCredentialRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		creds = append(creds, c)
+	}
+	return creds, rows.Err()
+}
+
+func (s *Store) UpdateCredential(ctx context.Context, cred *storage.Credential) error {
+	meta := normalizeJSON(cred.Metadata)
+	now := timeStr(time.Now().UTC())
+	var lastUsedStr *string
+	if cred.LastUsedAt != nil {
+		v := timeStr(*cred.LastUsedAt)
+		lastUsedStr = &v
+	}
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE credentials SET secret = ?, metadata = ?, credential_id = ?, public_key = ?, attestation_type = ?, aaguid = ?, sign_count = ?, display_name = ?, last_used_at = ?, updated_at = ? WHERE id = ?`,
+		cred.Secret, meta, cred.CredentialID, cred.PublicKey,
+		cred.AttestationType, cred.AAGUID, cred.SignCount,
+		cred.DisplayName, lastUsedStr, now, cred.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("sqlite: update credential: %w", err)
+	}
+	return checkRowsAffected(res, "credential")
+}
+
+func (s *Store) UpdateCredentialSignCount(ctx context.Context, id string, signCount uint32, lastUsedAt time.Time) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE credentials SET sign_count = ?, last_used_at = ? WHERE id = ?`,
+		signCount, timeStr(lastUsedAt), id,
+	)
+	if err != nil {
+		return fmt.Errorf("sqlite: update credential sign count: %w", err)
+	}
+	return checkRowsAffected(res, "credential")
+}
+
+func (s *Store) DeleteCredential(ctx context.Context, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM credentials WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("sqlite: delete credential: %w", err)
+	}
+	return checkRowsAffected(res, "credential")
+}
+
+func (s *Store) DeleteCredentialsByUserAndType(ctx context.Context, userID string, credType string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM credentials WHERE user_id = ? AND type = ?`, userID, credType)
+	if err != nil {
+		return fmt.Errorf("sqlite: delete credentials by user and type: %w", err)
+	}
+	return nil
+}
+
+func scanCredentialRow(row scanner) (*storage.Credential, error) {
+	var c storage.Credential
+	var meta string
+	var lastUsedStr *string
+	var createdAt, updatedAt string
+	err := row.Scan(&c.ID, &c.UserID, &c.Type, &c.Secret, &meta,
+		&c.CredentialID, &c.PublicKey,
+		&c.AttestationType, &c.AAGUID, &c.SignCount, &c.DisplayName,
+		&lastUsedStr, &createdAt, &updatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("sqlite: scan credential: %w", err)
+	}
+	c.Metadata = json.RawMessage(meta)
+	c.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	c.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+	if lastUsedStr != nil {
+		t, _ := time.Parse(time.RFC3339, *lastUsedStr)
+		c.LastUsedAt = &t
+	}
+	return &c, nil
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

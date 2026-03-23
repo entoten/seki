@@ -90,6 +90,24 @@ type RefreshToken struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// Credential represents a stored authentication credential (passkey, totp, password).
+type Credential struct {
+	ID              string          `json:"id"`
+	UserID          string          `json:"user_id"`
+	Type            string          `json:"type"`              // "passkey", "totp", "password"
+	Secret          []byte          `json:"-"`                 // TOTP secret or generic secret
+	CredentialID    []byte          `json:"credential_id"`     // WebAuthn credential ID
+	PublicKey       []byte          `json:"public_key"`        // COSE public key
+	AttestationType string          `json:"attestation_type"`
+	AAGUID          []byte          `json:"aaguid"`
+	SignCount       uint32          `json:"sign_count"`
+	DisplayName     string          `json:"display_name"`      // user-given name like "MacBook Pro"
+	Metadata        json.RawMessage `json:"metadata"`          // extra data (e.g. hashed recovery codes)
+	LastUsedAt      *time.Time      `json:"last_used_at"`
+	CreatedAt       time.Time       `json:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at"`
+}
+
 // AuditListOptions controls cursor-based pagination and filtering for audit logs.
 type AuditListOptions struct {
 	Cursor   string // opaque cursor (audit entry ID for keyset pagination)
