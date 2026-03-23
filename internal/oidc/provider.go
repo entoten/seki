@@ -3,6 +3,7 @@ package oidc
 import (
 	"net/http"
 
+	"github.com/Monet/seki/internal/config"
 	"github.com/Monet/seki/internal/crypto"
 	"github.com/Monet/seki/internal/session"
 	"github.com/Monet/seki/internal/storage"
@@ -10,10 +11,11 @@ import (
 
 // Provider serves OIDC discovery and JWKS endpoints.
 type Provider struct {
-	issuer   string
-	signer   crypto.Signer
-	store    storage.Storage
-	sessions *session.Manager
+	issuer      string
+	signer      crypto.Signer
+	store       storage.Storage
+	sessions    *session.Manager
+	authnConfig config.AuthenticationConfig
 }
 
 // NewProvider creates a new OIDC Provider.
@@ -39,6 +41,13 @@ func WithSessionManager(mgr *session.Manager) ProviderOption {
 	}
 }
 
+// WithAuthenticationConfig sets the authentication method configuration.
+func WithAuthenticationConfig(cfg config.AuthenticationConfig) ProviderOption {
+	return func(p *Provider) {
+		p.authnConfig = cfg
+	}
+}
+
 // RegisterRoutes registers the OIDC discovery and JWKS routes on the given mux.
 func (p *Provider) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /.well-known/openid-configuration", p.handleDiscovery)
@@ -46,4 +55,9 @@ func (p *Provider) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /authorize", p.handleAuthorize)
 	mux.HandleFunc("POST /token", p.handleToken)
 	mux.HandleFunc("GET /userinfo", p.handleUserInfo)
+
+	// Login / logout routes.
+	mux.HandleFunc("GET /login", p.handleLoginPage)
+	mux.HandleFunc("POST /login", p.handleLoginSubmit)
+	mux.HandleFunc("POST /logout", p.handleLogout)
 }

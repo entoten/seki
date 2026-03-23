@@ -292,8 +292,12 @@ func TestAuthorize_NoSession(t *testing.T) {
 		t.Fatalf("expected 302, got %d", resp.StatusCode)
 	}
 	loc, _ := resp.Location()
-	if loc.Query().Get("error") != "login_required" {
-		t.Errorf("error = %q, want login_required", loc.Query().Get("error"))
+	// Should redirect to /login with OIDC params preserved.
+	if loc.Path != "/login" {
+		t.Errorf("expected redirect to /login, got %q", loc.Path)
+	}
+	if loc.Query().Get("client_id") != "test-client" {
+		t.Errorf("client_id not preserved in login redirect: %q", loc.Query().Get("client_id"))
 	}
 }
 

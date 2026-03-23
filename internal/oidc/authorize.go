@@ -106,13 +106,13 @@ func (p *Provider) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 
 	sessionID, err := p.sessions.GetSessionID(r)
 	if err != nil {
-		redirectWithError(w, r, parsed, state, "login_required", "user is not authenticated")
+		p.redirectToLogin(w, r)
 		return
 	}
 
 	sess, err := p.sessions.Get(r.Context(), sessionID)
 	if err != nil {
-		redirectWithError(w, r, parsed, state, "login_required", "user session is invalid or expired")
+		p.redirectToLogin(w, r)
 		return
 	}
 
@@ -201,6 +201,12 @@ func redirectWithError(w http.ResponseWriter, r *http.Request, redirectURI *url.
 	}
 	redirectURI.RawQuery = q.Encode()
 	http.Redirect(w, r, redirectURI.String(), http.StatusFound)
+}
+
+// redirectToLogin sends the user to the login page, preserving OIDC query params.
+func (p *Provider) redirectToLogin(w http.ResponseWriter, r *http.Request) {
+	loginURL := "/login?" + r.URL.RawQuery
+	http.Redirect(w, r, loginURL, http.StatusFound)
 }
 
 // renderError displays an error page for cases where we cannot safely redirect.
