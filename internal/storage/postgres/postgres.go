@@ -43,6 +43,7 @@ func (s *Store) Migrate() error {
 	migrations := []string{
 		"migrations/001_init.up.sql",
 		"migrations/002_authorization_codes.up.sql",
+		"migrations/003_refresh_tokens.up.sql",
 	}
 	for _, name := range migrations {
 		data, err := migrationsFS.ReadFile(name)
@@ -448,6 +449,72 @@ func (s *Store) DeleteAuthCode(ctx context.Context, code string) error {
 		return storage.ErrNotFound
 	}
 	return nil
+}
+
+// ---------------------------------------------------------------------------
+// RefreshTokenStore
+// ---------------------------------------------------------------------------
+
+func (s *Store) CreateRefreshToken(ctx context.Context, token *storage.RefreshToken) error {
+	scopes, _ := json.Marshal(token.Scopes)
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO refresh_tokens (id, token_hash, client_id, user_id, scopes, family, expires_at, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		token.ID, token.TokenHash, token.ClientID, token.UserID,
+		string(scopes), token.Family,
+		token.ExpiresAt.UTC(), token.CreatedAt.UTC(),
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("postgres: create refresh token: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetRefreshTokenByHash(ctx context.Context, hash string) (*storage.RefreshToken, error) {
+	row := s.pool.QueryRow(ctx,
+		`SELECT id, token_hash, client_id, user_id, scopes, family, expires_at, created_at
+		 FROM refresh_tokens WHERE token_hash = $1`, hash)
+	var rt storage.RefreshToken
+	var scopes []byte
+	err := row.Scan(&rt.ID, &rt.TokenHash, &rt.ClientID, &rt.UserID, &scopes, &rt.Family, &rt.ExpiresAt, &rt.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("postgres: scan refresh token: %w", err)
+	}
+	_ = json.Unmarshal(scopes, &rt.Scopes)
+	return &rt, nil
+}
+
+func (s *Store) DeleteRefreshToken(ctx context.Context, id string) error {
+	ct, err := s.pool.Exec(ctx, `DELETE FROM refresh_tokens WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("postgres: delete refresh token: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DeleteRefreshTokensByFamily(ctx context.Context, family string) (int64, error) {
+	ct, err := s.pool.Exec(ctx, `DELETE FROM refresh_tokens WHERE family = $1`, family)
+	if err != nil {
+		return 0, fmt.Errorf("postgres: delete refresh tokens by family: %w", err)
+	}
+	return ct.RowsAffected(), nil
+}
+
+func (s *Store) DeleteRefreshTokensByUserID(ctx context.Context, userID string) (int64, error) {
+	ct, err := s.pool.Exec(ctx, `DELETE FROM refresh_tokens WHERE user_id = $1`, userID)
+	if err != nil {
+		return 0, fmt.Errorf("postgres: delete refresh tokens by user: %w", err)
+	}
+	return ct.RowsAffected(), nil
 }
 
 // ---------------------------------------------------------------------------

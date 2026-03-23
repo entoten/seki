@@ -413,6 +413,72 @@ func (s *Store) DeleteAuthCode(ctx context.Context, code string) error {
 }
 
 // ---------------------------------------------------------------------------
+// RefreshTokenStore
+// ---------------------------------------------------------------------------
+
+func (s *Store) CreateRefreshToken(ctx context.Context, token *storage.RefreshToken) error {
+	scopes, _ := json.Marshal(token.Scopes)
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO refresh_tokens (id, token_hash, client_id, user_id, scopes, family, expires_at, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		token.ID, token.TokenHash, token.ClientID, token.UserID,
+		string(scopes), token.Family,
+		timeStr(token.ExpiresAt), timeStr(token.CreatedAt),
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("sqlite: create refresh token: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetRefreshTokenByHash(ctx context.Context, hash string) (*storage.RefreshToken, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, token_hash, client_id, user_id, scopes, family, expires_at, created_at
+		 FROM refresh_tokens WHERE token_hash = ?`, hash)
+	var rt storage.RefreshToken
+	var scopes string
+	var expiresAt, createdAt string
+	err := row.Scan(&rt.ID, &rt.TokenHash, &rt.ClientID, &rt.UserID, &scopes, &rt.Family, &expiresAt, &createdAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("sqlite: scan refresh token: %w", err)
+	}
+	_ = json.Unmarshal([]byte(scopes), &rt.Scopes)
+	rt.ExpiresAt, _ = time.Parse(time.RFC3339, expiresAt)
+	rt.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	return &rt, nil
+}
+
+func (s *Store) DeleteRefreshToken(ctx context.Context, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM refresh_tokens WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("sqlite: delete refresh token: %w", err)
+	}
+	return checkRowsAffected(res, "refresh token")
+}
+
+func (s *Store) DeleteRefreshTokensByFamily(ctx context.Context, family string) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM refresh_tokens WHERE family = ?`, family)
+	if err != nil {
+		return 0, fmt.Errorf("sqlite: delete refresh tokens by family: %w", err)
+	}
+	return res.RowsAffected()
+}
+
+func (s *Store) DeleteRefreshTokensByUserID(ctx context.Context, userID string) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM refresh_tokens WHERE user_id = ?`, userID)
+	if err != nil {
+		return 0, fmt.Errorf("sqlite: delete refresh tokens by user: %w", err)
+	}
+	return res.RowsAffected()
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

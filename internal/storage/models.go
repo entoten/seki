@@ -78,6 +78,18 @@ type ListOptions struct {
 	Limit  int    // max items to return; 0 means use default
 }
 
+// RefreshToken represents an opaque refresh token stored as a hash.
+type RefreshToken struct {
+	ID        string    `json:"id"`
+	TokenHash string    `json:"token_hash"` // SHA-256 hash of the actual token
+	ClientID  string    `json:"client_id"`
+	UserID    string    `json:"user_id"`
+	Scopes    []string  `json:"scopes"`
+	Family    string    `json:"family"` // Token family for rotation tracking
+	ExpiresAt time.Time `json:"expires_at"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // AuditListOptions controls cursor-based pagination and filtering for audit logs.
 type AuditListOptions struct {
 	Cursor   string // opaque cursor (audit entry ID for keyset pagination)

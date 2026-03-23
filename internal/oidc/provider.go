@@ -44,4 +44,5 @@ func (p *Provider) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /.well-known/openid-configuration", p.handleDiscovery)
 	mux.HandleFunc("GET /.well-known/jwks.json", p.handleJWKS)
 	mux.HandleFunc("GET /authorize", p.handleAuthorize)
+	mux.HandleFunc("POST /token", p.handleToken)
 }

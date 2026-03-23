@@ -19,6 +19,7 @@ type Storage interface {
 	SessionStore
 	AuditStore
 	AuthCodeStore
+	RefreshTokenStore
 	Migrate() error
 	Close() error
 	Ping(ctx context.Context) error
@@ -63,4 +64,13 @@ type AuthCodeStore interface {
 	CreateAuthCode(ctx context.Context, code *AuthCode) error
 	GetAuthCode(ctx context.Context, code string) (*AuthCode, error)
 	DeleteAuthCode(ctx context.Context, code string) error
+}
+
+// RefreshTokenStore defines operations on OAuth2 refresh tokens.
+type RefreshTokenStore interface {
+	CreateRefreshToken(ctx context.Context, token *RefreshToken) error
+	GetRefreshTokenByHash(ctx context.Context, hash string) (*RefreshToken, error)
+	DeleteRefreshToken(ctx context.Context, id string) error
+	DeleteRefreshTokensByFamily(ctx context.Context, family string) (int64, error)
+	DeleteRefreshTokensByUserID(ctx context.Context, userID string) (int64, error)
 }
