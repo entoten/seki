@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/Monet/seki/internal/config"
@@ -23,6 +22,5 @@ func New(cfg *config.Config) *Server {
 
 // ListenAndServe starts the HTTP server.
 func (s *Server) ListenAndServe() error {
-	addr := fmt.Sprintf("%s:%d", s.cfg.Server.Host, s.cfg.Server.Port)
-	return http.ListenAndServe(addr, s.mux)
+	return http.ListenAndServe(s.cfg.Server.Address, s.mux)
 }
