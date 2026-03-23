@@ -261,6 +261,87 @@ func (s *Service) FinishDiscoverableLogin(ctx context.Context, sessionData strin
 	return resolvedUser, storageCred, nil
 }
 
+// ListCredentials returns all passkey credentials for a user.
+func (s *Service) ListCredentials(ctx context.Context, userID string) ([]*storage.Credential, error) {
+	creds, err := s.store.ListCredentialsByUser(ctx, userID, "passkey")
+	if err != nil {
+		return nil, fmt.Errorf("passkey: list credentials: %w", err)
+	}
+	return creds, nil
+}
+
+// RenameCredential updates the display name of a passkey credential.
+func (s *Service) RenameCredential(ctx context.Context, credentialID string, displayName string) error {
+	cred, err := s.store.GetCredential(ctx, credentialID)
+	if err != nil {
+		return fmt.Errorf("passkey: get credential: %w", err)
+	}
+	if cred.Type != "passkey" {
+		return fmt.Errorf("passkey: credential %s is not a passkey", credentialID)
+	}
+	cred.DisplayName = displayName
+	// Ensure Secret is not nil to satisfy NOT NULL constraint in storage.
+	if cred.Secret == nil {
+		cred.Secret = []byte{}
+	}
+	if err := s.store.UpdateCredential(ctx, cred); err != nil {
+		return fmt.Errorf("passkey: update credential: %w", err)
+	}
+	return nil
+}
+
+// DeleteCredential removes a passkey credential. It refuses to delete the last
+// authentication credential for a user to prevent lockout.
+func (s *Service) DeleteCredential(ctx context.Context, credentialID string) error {
+	cred, err := s.store.GetCredential(ctx, credentialID)
+	if err != nil {
+		return fmt.Errorf("passkey: get credential: %w", err)
+	}
+	if cred.Type != "passkey" {
+		return fmt.Errorf("passkey: credential %s is not a passkey", credentialID)
+	}
+
+	// Check that the user has at least one other authentication credential
+	// (of any type) so they are not locked out.
+	allCreds, err := s.store.ListCredentialsByUser(ctx, cred.UserID, "")
+	if err != nil {
+		return fmt.Errorf("passkey: list all credentials: %w", err)
+	}
+	if len(allCreds) <= 1 {
+		return fmt.Errorf("passkey: cannot delete last authentication credential")
+	}
+
+	if err := s.store.DeleteCredential(ctx, credentialID); err != nil {
+		return fmt.Errorf("passkey: delete credential: %w", err)
+	}
+	return nil
+}
+
+// GetInactiveCredentials returns passkey credentials for a user that have not
+// been used within the given threshold duration. Credentials that have never
+// been used (LastUsedAt is nil) are included if they were created before the
+// threshold.
+func (s *Service) GetInactiveCredentials(ctx context.Context, userID string, threshold time.Duration) ([]*storage.Credential, error) {
+	creds, err := s.store.ListCredentialsByUser(ctx, userID, "passkey")
+	if err != nil {
+		return nil, fmt.Errorf("passkey: list credentials: %w", err)
+	}
+
+	cutoff := time.Now().UTC().Add(-threshold)
+	var inactive []*storage.Credential
+	for _, c := range creds {
+		if c.LastUsedAt == nil {
+			// Never used — consider inactive if created before cutoff.
+			if c.CreatedAt.Before(cutoff) {
+				inactive = append(inactive, c)
+			}
+		} else if c.LastUsedAt.Before(cutoff) {
+			inactive = append(inactive, c)
+		}
+	}
+	return inactive, nil
+}
+
 // buildOrigins constructs plausible origins from an RP ID for both https and
 // localhost dev.
 func buildOrigins(rpID string) []string {

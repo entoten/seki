@@ -3,6 +3,8 @@ package passkey_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -449,6 +451,301 @@ func TestBeginDiscoverableLogin(t *testing.T) {
 	var sd webauthn.SessionData
 	if err := json.Unmarshal([]byte(sessionData), &sd); err != nil {
 		t.Fatalf("session data is not valid JSON: %v", err)
+	}
+}
+
+// --- Credential lifecycle management tests ---
+
+func TestListCredentials(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	user := testUser(t, store)
+
+	svc, err := passkey.NewService(testConfig(), store)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	// Initially no credentials.
+	creds, err := svc.ListCredentials(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("ListCredentials: %v", err)
+	}
+	if len(creds) != 0 {
+		t.Fatalf("expected 0 credentials, got %d", len(creds))
+	}
+
+	// Add two credentials.
+	now := time.Now().UTC().Truncate(time.Second)
+	for i, name := range []string{"Key A", "Key B"} {
+		cred := &storage.Credential{
+			ID:              fmt.Sprintf("cred_list_%d", i),
+			UserID:          user.ID,
+			Type:            "passkey",
+			CredentialID:    []byte(fmt.Sprintf("list-cred-id-%d", i)),
+			PublicKey:       []byte("pubkey"),
+			AttestationType: "none",
+			AAGUID:          []byte("aaguid-list-1234"),
+			SignCount:       0,
+			DisplayName:     name,
+			CreatedAt:       now,
+		}
+		if err := store.CreateCredential(ctx, cred); err != nil {
+			t.Fatalf("CreateCredential: %v", err)
+		}
+	}
+
+	creds, err = svc.ListCredentials(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("ListCredentials: %v", err)
+	}
+	if len(creds) != 2 {
+		t.Fatalf("expected 2 credentials, got %d", len(creds))
+	}
+}
+
+func TestRenameCredential(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	user := testUser(t, store)
+
+	svc, err := passkey.NewService(testConfig(), store)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	cred := &storage.Credential{
+		ID:              "cred_rename_001",
+		UserID:          user.ID,
+		Type:            "passkey",
+		CredentialID:    []byte("rename-cred-id"),
+		PublicKey:       []byte("pubkey"),
+		AttestationType: "none",
+		AAGUID:          []byte("aaguid-rename-12"),
+		SignCount:       0,
+		DisplayName:     "Old Name",
+		CreatedAt:       now,
+	}
+	if err := store.CreateCredential(ctx, cred); err != nil {
+		t.Fatalf("CreateCredential: %v", err)
+	}
+
+	if err := svc.RenameCredential(ctx, cred.ID, "New Name"); err != nil {
+		t.Fatalf("RenameCredential: %v", err)
+	}
+
+	got, err := store.GetCredential(ctx, cred.ID)
+	if err != nil {
+		t.Fatalf("GetCredential: %v", err)
+	}
+	if got.DisplayName != "New Name" {
+		t.Errorf("DisplayName = %q, want %q", got.DisplayName, "New Name")
+	}
+}
+
+func TestDeleteCredential(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	user := testUser(t, store)
+
+	svc, err := passkey.NewService(testConfig(), store)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	// Create two credentials so deletion is allowed.
+	for i := range 2 {
+		cred := &storage.Credential{
+			ID:              fmt.Sprintf("cred_del_%d", i),
+			UserID:          user.ID,
+			Type:            "passkey",
+			CredentialID:    []byte(fmt.Sprintf("del-cred-id-%d", i)),
+			PublicKey:       []byte("pubkey"),
+			AttestationType: "none",
+			AAGUID:          []byte("aaguid-delete-12"),
+			SignCount:       0,
+			DisplayName:     fmt.Sprintf("Key %d", i),
+			CreatedAt:       now,
+		}
+		if err := store.CreateCredential(ctx, cred); err != nil {
+			t.Fatalf("CreateCredential: %v", err)
+		}
+	}
+
+	// Delete one credential — should succeed.
+	if err := svc.DeleteCredential(ctx, "cred_del_0"); err != nil {
+		t.Fatalf("DeleteCredential: %v", err)
+	}
+
+	// Verify it's gone.
+	_, err = store.GetCredential(ctx, "cred_del_0")
+	if err != storage.ErrNotFound {
+		t.Fatalf("expected ErrNotFound, got: %v", err)
+	}
+}
+
+func TestDeleteCredential_CannotDeleteLast(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	user := testUser(t, store)
+
+	svc, err := passkey.NewService(testConfig(), store)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	cred := &storage.Credential{
+		ID:              "cred_last_001",
+		UserID:          user.ID,
+		Type:            "passkey",
+		CredentialID:    []byte("last-cred-id"),
+		PublicKey:       []byte("pubkey"),
+		AttestationType: "none",
+		AAGUID:          []byte("aaguid-last-1234"),
+		SignCount:       0,
+		DisplayName:     "Only Key",
+		CreatedAt:       now,
+	}
+	if err := store.CreateCredential(ctx, cred); err != nil {
+		t.Fatalf("CreateCredential: %v", err)
+	}
+
+	// Attempt to delete the only credential — must fail.
+	err = svc.DeleteCredential(ctx, cred.ID)
+	if err == nil {
+		t.Fatal("expected error when deleting last credential")
+	}
+	if !strings.Contains(err.Error(), "cannot delete last") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify the credential still exists.
+	got, err := store.GetCredential(ctx, cred.ID)
+	if err != nil {
+		t.Fatalf("GetCredential: %v", err)
+	}
+	if got.ID != cred.ID {
+		t.Errorf("credential should still exist")
+	}
+}
+
+func TestGetInactiveCredentials(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	user := testUser(t, store)
+
+	svc, err := passkey.NewService(testConfig(), store)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	oldTime := now.Add(-100 * 24 * time.Hour) // 100 days ago
+	recentTime := now.Add(-1 * time.Hour)      // 1 hour ago
+
+	// Credential 1: used 100 days ago (inactive).
+	cred1 := &storage.Credential{
+		ID:              "cred_inactive_001",
+		UserID:          user.ID,
+		Type:            "passkey",
+		CredentialID:    []byte("inactive-cred-1"),
+		PublicKey:       []byte("pubkey"),
+		AttestationType: "none",
+		AAGUID:          []byte("aaguid-inact-123"),
+		SignCount:       1,
+		DisplayName:     "Old Key",
+		LastUsedAt:      &oldTime,
+		CreatedAt:       oldTime,
+	}
+	// Credential 2: used 1 hour ago (active).
+	cred2 := &storage.Credential{
+		ID:              "cred_inactive_002",
+		UserID:          user.ID,
+		Type:            "passkey",
+		CredentialID:    []byte("inactive-cred-2"),
+		PublicKey:       []byte("pubkey"),
+		AttestationType: "none",
+		AAGUID:          []byte("aaguid-inact-456"),
+		SignCount:       5,
+		DisplayName:     "Active Key",
+		LastUsedAt:      &recentTime,
+		CreatedAt:       now,
+	}
+	// Credential 3: never used, created 100 days ago (inactive).
+	cred3 := &storage.Credential{
+		ID:              "cred_inactive_003",
+		UserID:          user.ID,
+		Type:            "passkey",
+		CredentialID:    []byte("inactive-cred-3"),
+		PublicKey:       []byte("pubkey"),
+		AttestationType: "none",
+		AAGUID:          []byte("aaguid-inact-789"),
+		SignCount:       0,
+		DisplayName:     "Never Used Key",
+		CreatedAt:       oldTime,
+	}
+
+	for _, c := range []*storage.Credential{cred1, cred2, cred3} {
+		if err := store.CreateCredential(ctx, c); err != nil {
+			t.Fatalf("CreateCredential %s: %v", c.ID, err)
+		}
+	}
+
+	// 90-day threshold: should return cred1 (old LastUsedAt) and cred3 (never used, old CreatedAt).
+	inactive, err := svc.GetInactiveCredentials(ctx, user.ID, 90*24*time.Hour)
+	if err != nil {
+		t.Fatalf("GetInactiveCredentials: %v", err)
+	}
+	if len(inactive) != 2 {
+		t.Fatalf("expected 2 inactive credentials, got %d", len(inactive))
+	}
+
+	ids := map[string]bool{}
+	for _, c := range inactive {
+		ids[c.ID] = true
+	}
+	if !ids["cred_inactive_001"] {
+		t.Error("expected cred_inactive_001 (old LastUsedAt) to be inactive")
+	}
+	if !ids["cred_inactive_003"] {
+		t.Error("expected cred_inactive_003 (never used, old CreatedAt) to be inactive")
+	}
+	if ids["cred_inactive_002"] {
+		t.Error("cred_inactive_002 (recently used) should not be inactive")
+	}
+}
+
+func TestUserIDStableAcrossEmailChanges(t *testing.T) {
+	// Verify that WebAuthnID is based on the stable user ID, not the email.
+	// If a user changes their email, their passkeys should still work because
+	// WebAuthnID remains the same.
+	user := &storage.User{
+		ID:          "usr_stable_001",
+		Email:       "original@example.com",
+		DisplayName: "Stable User",
+	}
+
+	adapter1 := passkey.NewUserAdapter(user, nil)
+	id1 := string(adapter1.WebAuthnID())
+
+	// Simulate an email change.
+	user.Email = "changed@example.com"
+	adapter2 := passkey.NewUserAdapter(user, nil)
+	id2 := string(adapter2.WebAuthnID())
+
+	if id1 != id2 {
+		t.Errorf("WebAuthnID changed after email update: %q != %q", id1, id2)
+	}
+	if id1 != "usr_stable_001" {
+		t.Errorf("WebAuthnID = %q, want %q (should be user's stable ID)", id1, "usr_stable_001")
+	}
+
+	// Confirm WebAuthnName changed with email (as expected for display).
+	if adapter2.WebAuthnName() != "changed@example.com" {
+		t.Errorf("WebAuthnName = %q, want %q", adapter2.WebAuthnName(), "changed@example.com")
 	}
 }
 

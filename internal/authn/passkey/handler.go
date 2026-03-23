@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,6 +52,12 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /authn/passkey/login/finish", h.handleLoginFinish)
 	mux.HandleFunc("POST /authn/passkey/login/discoverable/begin", h.handleDiscoverableLoginBegin)
 	mux.HandleFunc("POST /authn/passkey/login/discoverable/finish", h.handleDiscoverableLoginFinish)
+
+	// Credential lifecycle management.
+	mux.HandleFunc("GET /authn/passkey/credentials", h.handleListCredentials)
+	mux.HandleFunc("GET /authn/passkey/credentials/inactive", h.handleListInactiveCredentials)
+	mux.HandleFunc("PATCH /authn/passkey/credentials/{id}", h.handleRenameCredential)
+	mux.HandleFunc("DELETE /authn/passkey/credentials/{id}", h.handleDeleteCredential)
 }
 
 // --- Registration ---
@@ -220,6 +227,127 @@ func (h *Handler) handleDiscoverableLoginFinish(w http.ResponseWriter, r *http.R
 		"session_id": sess.ID,
 		"user_id":    user.ID,
 	})
+}
+
+// --- Credential lifecycle management ---
+
+func (h *Handler) handleListCredentials(w http.ResponseWriter, r *http.Request) {
+	user, err := h.authenticatedUser(r)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, errorResponse{Error: "authentication required"})
+		return
+	}
+
+	creds, err := h.svc.ListCredentials(r.Context(), user.ID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: fmt.Sprintf("list credentials: %v", err)})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{"credentials": creds})
+}
+
+func (h *Handler) handleRenameCredential(w http.ResponseWriter, r *http.Request) {
+	user, err := h.authenticatedUser(r)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, errorResponse{Error: "authentication required"})
+		return
+	}
+
+	credID := r.PathValue("id")
+	if credID == "" {
+		writeJSON(w, http.StatusBadRequest, errorResponse{Error: "credential id is required"})
+		return
+	}
+
+	// Verify the credential belongs to the authenticated user.
+	cred, err := h.store.GetCredential(r.Context(), credID)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, errorResponse{Error: "credential not found"})
+		return
+	}
+	if cred.UserID != user.ID {
+		writeJSON(w, http.StatusForbidden, errorResponse{Error: "credential does not belong to user"})
+		return
+	}
+
+	var req struct {
+		DisplayName string `json:"display_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.DisplayName == "" {
+		writeJSON(w, http.StatusBadRequest, errorResponse{Error: "display_name is required"})
+		return
+	}
+
+	if err := h.svc.RenameCredential(r.Context(), credID, req.DisplayName); err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: fmt.Sprintf("rename credential: %v", err)})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) handleDeleteCredential(w http.ResponseWriter, r *http.Request) {
+	user, err := h.authenticatedUser(r)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, errorResponse{Error: "authentication required"})
+		return
+	}
+
+	credID := r.PathValue("id")
+	if credID == "" {
+		writeJSON(w, http.StatusBadRequest, errorResponse{Error: "credential id is required"})
+		return
+	}
+
+	// Verify the credential belongs to the authenticated user.
+	cred, err := h.store.GetCredential(r.Context(), credID)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, errorResponse{Error: "credential not found"})
+		return
+	}
+	if cred.UserID != user.ID {
+		writeJSON(w, http.StatusForbidden, errorResponse{Error: "credential does not belong to user"})
+		return
+	}
+
+	if err := h.svc.DeleteCredential(r.Context(), credID); err != nil {
+		if strings.Contains(err.Error(), "cannot delete last") {
+			writeJSON(w, http.StatusConflict, errorResponse{Error: "cannot delete last authentication credential"})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: fmt.Sprintf("delete credential: %v", err)})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) handleListInactiveCredentials(w http.ResponseWriter, r *http.Request) {
+	user, err := h.authenticatedUser(r)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, errorResponse{Error: "authentication required"})
+		return
+	}
+
+	// Default threshold: 90 days.
+	threshold := 90 * 24 * time.Hour
+	if t := r.URL.Query().Get("threshold"); t != "" {
+		parsed, err := time.ParseDuration(t)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, errorResponse{Error: "invalid threshold duration"})
+			return
+		}
+		threshold = parsed
+	}
+
+	creds, err := h.svc.GetInactiveCredentials(r.Context(), user.ID, threshold)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: fmt.Sprintf("list inactive credentials: %v", err)})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{"credentials": creds})
 }
 
 // --- Challenge store helpers ---
