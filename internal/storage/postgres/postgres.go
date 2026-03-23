@@ -38,14 +38,20 @@ func New(ctx context.Context, dsn string) (*Store, error) {
 	return &Store{pool: pool}, nil
 }
 
-// Migrate runs the embedded migration SQL against the database.
+// Migrate runs the embedded migration SQL files against the database in order.
 func (s *Store) Migrate() error {
-	data, err := migrationsFS.ReadFile("migrations/001_init.up.sql")
-	if err != nil {
-		return fmt.Errorf("postgres: read migration: %w", err)
+	migrations := []string{
+		"migrations/001_init.up.sql",
+		"migrations/002_session_timeouts.up.sql",
 	}
-	if _, err := s.pool.Exec(context.Background(), string(data)); err != nil {
-		return fmt.Errorf("postgres: run migration: %w", err)
+	for _, name := range migrations {
+		data, err := migrationsFS.ReadFile(name)
+		if err != nil {
+			return fmt.Errorf("postgres: read migration %s: %w", name, err)
+		}
+		if _, err := s.pool.Exec(context.Background(), string(data)); err != nil {
+			return fmt.Errorf("postgres: run migration %s: %w", name, err)
+		}
 	}
 	return nil
 }
@@ -243,11 +249,12 @@ func (s *Store) DeleteClient(ctx context.Context, id string) error {
 func (s *Store) CreateSession(ctx context.Context, session *storage.Session) error {
 	meta := normalizeJSON(session.Metadata)
 	_, err := s.pool.Exec(ctx,
-		`INSERT INTO sessions (id, user_id, client_id, ip_address, user_agent, metadata, created_at, expires_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		`INSERT INTO sessions (id, user_id, client_id, ip_address, user_agent, metadata, created_at, expires_at, last_active_at, absolute_expires_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 		session.ID, session.UserID, session.ClientID,
 		session.IPAddress, session.UserAgent, meta,
 		session.CreatedAt.UTC(), session.ExpiresAt.UTC(),
+		session.LastActiveAt.UTC(), session.AbsoluteExpiresAt.UTC(),
 	)
 	if err != nil {
 		return fmt.Errorf("postgres: create session: %w", err)
@@ -257,11 +264,11 @@ func (s *Store) CreateSession(ctx context.Context, session *storage.Session) err
 
 func (s *Store) GetSession(ctx context.Context, id string) (*storage.Session, error) {
 	row := s.pool.QueryRow(ctx,
-		`SELECT id, user_id, client_id, ip_address, user_agent, metadata, created_at, expires_at
+		`SELECT id, user_id, client_id, ip_address, user_agent, metadata, created_at, expires_at, last_active_at, absolute_expires_at
 		 FROM sessions WHERE id = $1`, id)
 	var sess storage.Session
 	var meta []byte
-	err := row.Scan(&sess.ID, &sess.UserID, &sess.ClientID, &sess.IPAddress, &sess.UserAgent, &meta, &sess.CreatedAt, &sess.ExpiresAt)
+	err := row.Scan(&sess.ID, &sess.UserID, &sess.ClientID, &sess.IPAddress, &sess.UserAgent, &meta, &sess.CreatedAt, &sess.ExpiresAt, &sess.LastActiveAt, &sess.AbsoluteExpiresAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, storage.ErrNotFound
@@ -284,9 +291,32 @@ func (s *Store) DeleteSession(ctx context.Context, id string) error {
 }
 
 func (s *Store) DeleteExpiredSessions(ctx context.Context) (int64, error) {
-	ct, err := s.pool.Exec(ctx, `DELETE FROM sessions WHERE expires_at < $1`, time.Now().UTC())
+	now := time.Now().UTC()
+	ct, err := s.pool.Exec(ctx, `DELETE FROM sessions WHERE expires_at < $1 OR absolute_expires_at < $1`, now)
 	if err != nil {
 		return 0, fmt.Errorf("postgres: delete expired sessions: %w", err)
+	}
+	return ct.RowsAffected(), nil
+}
+
+func (s *Store) UpdateSessionActivity(ctx context.Context, id string, lastActive time.Time) error {
+	ct, err := s.pool.Exec(ctx,
+		`UPDATE sessions SET last_active_at = $1 WHERE id = $2`,
+		lastActive.UTC(), id,
+	)
+	if err != nil {
+		return fmt.Errorf("postgres: update session activity: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DeleteSessionsByUserID(ctx context.Context, userID string) (int64, error) {
+	ct, err := s.pool.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1`, userID)
+	if err != nil {
+		return 0, fmt.Errorf("postgres: delete sessions by user: %w", err)
 	}
 	return ct.RowsAffected(), nil
 }

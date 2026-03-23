@@ -38,14 +38,16 @@ CREATE TABLE IF NOT EXISTS clients (
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
-    id          TEXT PRIMARY KEY,
-    user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    client_id   TEXT NOT NULL DEFAULT '',
-    ip_address  TEXT NOT NULL DEFAULT '',
-    user_agent  TEXT NOT NULL DEFAULT '',
-    metadata    TEXT NOT NULL DEFAULT '{}',
-    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    expires_at  TEXT NOT NULL
+    id                  TEXT PRIMARY KEY,
+    user_id             TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    client_id           TEXT NOT NULL DEFAULT '',
+    ip_address          TEXT NOT NULL DEFAULT '',
+    user_agent          TEXT NOT NULL DEFAULT '',
+    metadata            TEXT NOT NULL DEFAULT '{}',
+    created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    expires_at          TEXT NOT NULL,
+    last_active_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    absolute_expires_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions (user_id);

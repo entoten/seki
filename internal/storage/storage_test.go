@@ -245,14 +245,16 @@ func TestSessionCRUD(t *testing.T) {
 	}
 
 	session := &storage.Session{
-		ID:        "ses_001",
-		UserID:    user.ID,
-		ClientID:  "cli_001",
-		IPAddress: "192.168.1.1",
-		UserAgent: "TestAgent/1.0",
-		Metadata:  json.RawMessage(`{"device":"desktop"}`),
-		CreatedAt: time.Now().UTC().Truncate(time.Second),
-		ExpiresAt: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Second),
+		ID:                "ses_001",
+		UserID:            user.ID,
+		ClientID:          "cli_001",
+		IPAddress:         "192.168.1.1",
+		UserAgent:         "TestAgent/1.0",
+		Metadata:          json.RawMessage(`{"device":"desktop"}`),
+		CreatedAt:         time.Now().UTC().Truncate(time.Second),
+		ExpiresAt:         time.Now().UTC().Add(24 * time.Hour).Truncate(time.Second),
+		LastActiveAt:      time.Now().UTC().Truncate(time.Second),
+		AbsoluteExpiresAt: time.Now().UTC().Add(48 * time.Hour).Truncate(time.Second),
 	}
 
 	// Create
@@ -306,19 +308,23 @@ func TestDeleteExpiredSessions(t *testing.T) {
 
 	// Create an expired session
 	expired := &storage.Session{
-		ID:        "ses_expired",
-		UserID:    user.ID,
-		Metadata:  json.RawMessage(`{}`),
-		CreatedAt: now.Add(-2 * time.Hour),
-		ExpiresAt: now.Add(-1 * time.Hour),
+		ID:                "ses_expired",
+		UserID:            user.ID,
+		Metadata:          json.RawMessage(`{}`),
+		CreatedAt:         now.Add(-2 * time.Hour),
+		ExpiresAt:         now.Add(-1 * time.Hour),
+		LastActiveAt:      now.Add(-2 * time.Hour),
+		AbsoluteExpiresAt: now.Add(-1 * time.Hour),
 	}
 	// Create a valid session
 	valid := &storage.Session{
-		ID:        "ses_valid",
-		UserID:    user.ID,
-		Metadata:  json.RawMessage(`{}`),
-		CreatedAt: now,
-		ExpiresAt: now.Add(1 * time.Hour),
+		ID:                "ses_valid",
+		UserID:            user.ID,
+		Metadata:          json.RawMessage(`{}`),
+		CreatedAt:         now,
+		ExpiresAt:         now.Add(1 * time.Hour),
+		LastActiveAt:      now,
+		AbsoluteExpiresAt: now.Add(24 * time.Hour),
 	}
 	if err := s.CreateSession(ctx, expired); err != nil {
 		t.Fatalf("create expired session: %v", err)

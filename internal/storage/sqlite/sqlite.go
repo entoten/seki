@@ -43,14 +43,10 @@ func New(dsn string) (*Store, error) {
 	return &Store{db: db}, nil
 }
 
-// Migrate runs the embedded migration SQL against the database.
+// Migrate runs all embedded up migrations against the database in order.
 func (s *Store) Migrate() error {
-	data, err := migrationsFS.ReadFile("migrations/001_init.up.sql")
-	if err != nil {
-		return fmt.Errorf("sqlite: read migration: %w", err)
-	}
-	if _, err := s.db.Exec(string(data)); err != nil {
-		return fmt.Errorf("sqlite: run migration: %w", err)
+	if err := RunMigrations(s.db); err != nil {
+		return fmt.Errorf("sqlite: %w", err)
 	}
 	return nil
 }
@@ -238,11 +234,12 @@ func (s *Store) DeleteClient(ctx context.Context, id string) error {
 func (s *Store) CreateSession(ctx context.Context, session *storage.Session) error {
 	meta := normalizeJSON(session.Metadata)
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO sessions (id, user_id, client_id, ip_address, user_agent, metadata, created_at, expires_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO sessions (id, user_id, client_id, ip_address, user_agent, metadata, created_at, expires_at, last_active_at, absolute_expires_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		session.ID, session.UserID, session.ClientID,
 		session.IPAddress, session.UserAgent, meta,
 		timeStr(session.CreatedAt), timeStr(session.ExpiresAt),
+		timeStr(session.LastActiveAt), timeStr(session.AbsoluteExpiresAt),
 	)
 	if err != nil {
 		return fmt.Errorf("sqlite: create session: %w", err)
@@ -252,7 +249,7 @@ func (s *Store) CreateSession(ctx context.Context, session *storage.Session) err
 
 func (s *Store) GetSession(ctx context.Context, id string) (*storage.Session, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, user_id, client_id, ip_address, user_agent, metadata, created_at, expires_at
+		`SELECT id, user_id, client_id, ip_address, user_agent, metadata, created_at, expires_at, last_active_at, absolute_expires_at
 		 FROM sessions WHERE id = ?`, id)
 	return scanSession(row)
 }
@@ -267,9 +264,28 @@ func (s *Store) DeleteSession(ctx context.Context, id string) error {
 
 func (s *Store) DeleteExpiredSessions(ctx context.Context) (int64, error) {
 	now := timeStr(time.Now().UTC())
-	res, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at < ?`, now)
+	res, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at < ? OR absolute_expires_at < ?`, now, now)
 	if err != nil {
 		return 0, fmt.Errorf("sqlite: delete expired sessions: %w", err)
+	}
+	return res.RowsAffected()
+}
+
+func (s *Store) UpdateSessionActivity(ctx context.Context, id string, lastActive time.Time) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE sessions SET last_active_at = ? WHERE id = ?`,
+		timeStr(lastActive), id,
+	)
+	if err != nil {
+		return fmt.Errorf("sqlite: update session activity: %w", err)
+	}
+	return checkRowsAffected(res, "session")
+}
+
+func (s *Store) DeleteSessionsByUserID(ctx context.Context, userID string) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, userID)
+	if err != nil {
+		return 0, fmt.Errorf("sqlite: delete sessions by user: %w", err)
 	}
 	return res.RowsAffected()
 }
@@ -405,8 +421,8 @@ func scanClientFromRows(rows *sql.Rows) (*storage.Client, error) {
 func scanSession(row scanner) (*storage.Session, error) {
 	var sess storage.Session
 	var meta string
-	var createdAt, expiresAt string
-	err := row.Scan(&sess.ID, &sess.UserID, &sess.ClientID, &sess.IPAddress, &sess.UserAgent, &meta, &createdAt, &expiresAt)
+	var createdAt, expiresAt, lastActiveAt, absoluteExpiresAt string
+	err := row.Scan(&sess.ID, &sess.UserID, &sess.ClientID, &sess.IPAddress, &sess.UserAgent, &meta, &createdAt, &expiresAt, &lastActiveAt, &absoluteExpiresAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, storage.ErrNotFound
@@ -416,6 +432,8 @@ func scanSession(row scanner) (*storage.Session, error) {
 	sess.Metadata = json.RawMessage(meta)
 	sess.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 	sess.ExpiresAt, _ = time.Parse(time.RFC3339, expiresAt)
+	sess.LastActiveAt, _ = time.Parse(time.RFC3339, lastActiveAt)
+	sess.AbsoluteExpiresAt, _ = time.Parse(time.RFC3339, absoluteExpiresAt)
 	return &sess, nil
 }
 

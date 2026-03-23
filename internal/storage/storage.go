@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 // Common errors returned by storage implementations.
@@ -46,6 +47,8 @@ type SessionStore interface {
 	GetSession(ctx context.Context, id string) (*Session, error)
 	DeleteSession(ctx context.Context, id string) error
 	DeleteExpiredSessions(ctx context.Context) (int64, error)
+	UpdateSessionActivity(ctx context.Context, id string, lastActive time.Time) error
+	DeleteSessionsByUserID(ctx context.Context, userID string) (int64, error)
 }
 
 // AuditStore defines operations on audit log entries.
