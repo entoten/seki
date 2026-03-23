@@ -57,6 +57,21 @@ type AuditEntry struct {
 	CreatedAt  time.Time       `json:"created_at"`
 }
 
+// AuthCode represents an OAuth2 authorization code.
+type AuthCode struct {
+	Code                string    `json:"code"`
+	ClientID            string    `json:"client_id"`
+	UserID              string    `json:"user_id"`
+	RedirectURI         string    `json:"redirect_uri"`
+	Scopes              []string  `json:"scopes"`
+	CodeChallenge       string    `json:"code_challenge"`
+	CodeChallengeMethod string    `json:"code_challenge_method"`
+	Nonce               string    `json:"nonce"`
+	State               string    `json:"state"`
+	ExpiresAt           time.Time `json:"expires_at"`
+	CreatedAt           time.Time `json:"created_at"`
+}
+
 // ListOptions controls cursor-based pagination for user lists.
 type ListOptions struct {
 	Cursor string // opaque cursor (user ID for keyset pagination)

@@ -42,7 +42,7 @@ func New(ctx context.Context, dsn string) (*Store, error) {
 func (s *Store) Migrate() error {
 	migrations := []string{
 		"migrations/001_init.up.sql",
-		"migrations/002_session_timeouts.up.sql",
+		"migrations/002_authorization_codes.up.sql",
 	}
 	for _, name := range migrations {
 		data, err := migrationsFS.ReadFile(name)
@@ -397,6 +397,57 @@ func (s *Store) ListAuditLogs(ctx context.Context, opts storage.AuditListOptions
 		entries = entries[:limit]
 	}
 	return entries, nextCursor, nil
+}
+
+// ---------------------------------------------------------------------------
+// AuthCodeStore
+// ---------------------------------------------------------------------------
+
+func (s *Store) CreateAuthCode(ctx context.Context, code *storage.AuthCode) error {
+	scopes, _ := json.Marshal(code.Scopes)
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO authorization_codes (code, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, nonce, state, expires_at, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		code.Code, code.ClientID, code.UserID, code.RedirectURI,
+		string(scopes), code.CodeChallenge, code.CodeChallengeMethod,
+		code.Nonce, code.State,
+		code.ExpiresAt.UTC(), code.CreatedAt.UTC(),
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("postgres: create auth code: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetAuthCode(ctx context.Context, code string) (*storage.AuthCode, error) {
+	row := s.pool.QueryRow(ctx,
+		`SELECT code, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, nonce, state, expires_at, created_at
+		 FROM authorization_codes WHERE code = $1`, code)
+	var ac storage.AuthCode
+	var scopes []byte
+	err := row.Scan(&ac.Code, &ac.ClientID, &ac.UserID, &ac.RedirectURI, &scopes, &ac.CodeChallenge, &ac.CodeChallengeMethod, &ac.Nonce, &ac.State, &ac.ExpiresAt, &ac.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("postgres: scan auth code: %w", err)
+	}
+	_ = json.Unmarshal(scopes, &ac.Scopes)
+	return &ac, nil
+}
+
+func (s *Store) DeleteAuthCode(ctx context.Context, code string) error {
+	ct, err := s.pool.Exec(ctx, `DELETE FROM authorization_codes WHERE code = $1`, code)
+	if err != nil {
+		return fmt.Errorf("postgres: delete auth code: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------

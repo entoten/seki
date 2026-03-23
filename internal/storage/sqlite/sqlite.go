@@ -362,6 +362,57 @@ func (s *Store) ListAuditLogs(ctx context.Context, opts storage.AuditListOptions
 }
 
 // ---------------------------------------------------------------------------
+// AuthCodeStore
+// ---------------------------------------------------------------------------
+
+func (s *Store) CreateAuthCode(ctx context.Context, code *storage.AuthCode) error {
+	scopes, _ := json.Marshal(code.Scopes)
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO authorization_codes (code, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, nonce, state, expires_at, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		code.Code, code.ClientID, code.UserID, code.RedirectURI,
+		string(scopes), code.CodeChallenge, code.CodeChallengeMethod,
+		code.Nonce, code.State,
+		timeStr(code.ExpiresAt), timeStr(code.CreatedAt),
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("sqlite: create auth code: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetAuthCode(ctx context.Context, code string) (*storage.AuthCode, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT code, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, nonce, state, expires_at, created_at
+		 FROM authorization_codes WHERE code = ?`, code)
+	var ac storage.AuthCode
+	var scopes string
+	var expiresAt, createdAt string
+	err := row.Scan(&ac.Code, &ac.ClientID, &ac.UserID, &ac.RedirectURI, &scopes, &ac.CodeChallenge, &ac.CodeChallengeMethod, &ac.Nonce, &ac.State, &expiresAt, &createdAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("sqlite: scan auth code: %w", err)
+	}
+	_ = json.Unmarshal([]byte(scopes), &ac.Scopes)
+	ac.ExpiresAt, _ = time.Parse(time.RFC3339, expiresAt)
+	ac.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	return &ac, nil
+}
+
+func (s *Store) DeleteAuthCode(ctx context.Context, code string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM authorization_codes WHERE code = ?`, code)
+	if err != nil {
+		return fmt.Errorf("sqlite: delete auth code: %w", err)
+	}
+	return checkRowsAffected(res, "authorization code")
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

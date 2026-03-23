@@ -18,6 +18,7 @@ type Storage interface {
 	ClientStore
 	SessionStore
 	AuditStore
+	AuthCodeStore
 	Migrate() error
 	Close() error
 	Ping(ctx context.Context) error
@@ -55,4 +56,11 @@ type SessionStore interface {
 type AuditStore interface {
 	CreateAuditLog(ctx context.Context, entry *AuditEntry) error
 	ListAuditLogs(ctx context.Context, opts AuditListOptions) ([]*AuditEntry, string, error)
+}
+
+// AuthCodeStore defines operations on OAuth2 authorization codes.
+type AuthCodeStore interface {
+	CreateAuthCode(ctx context.Context, code *AuthCode) error
+	GetAuthCode(ctx context.Context, code string) (*AuthCode, error)
+	DeleteAuthCode(ctx context.Context, code string) error
 }
