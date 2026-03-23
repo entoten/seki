@@ -8,21 +8,25 @@ import (
 	"time"
 
 	"github.com/Monet/seki/internal/config"
+	"github.com/Monet/seki/internal/crypto"
+	"github.com/Monet/seki/internal/oidc"
 )
 
 // Server wraps the HTTP server and its dependencies.
 type Server struct {
 	cfg    *config.Config
+	signer crypto.Signer
 	mux    *http.ServeMux
 	server *http.Server
 }
 
 // New creates a new Server with the given configuration.
-func New(cfg *config.Config) *Server {
+func New(cfg *config.Config, signer crypto.Signer) *Server {
 	mux := http.NewServeMux()
 	s := &Server{
-		cfg: cfg,
-		mux: mux,
+		cfg:    cfg,
+		signer: signer,
+		mux:    mux,
 		server: &http.Server{
 			Addr:              cfg.Server.Address,
 			Handler:           mux,
@@ -36,6 +40,10 @@ func New(cfg *config.Config) *Server {
 // registerRoutes sets up all HTTP routes.
 func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
+
+	// Register OIDC discovery and JWKS endpoints.
+	provider := oidc.NewProvider(s.cfg.Server.Issuer, s.signer, nil)
+	provider.RegisterRoutes(s.mux)
 }
 
 // handleHealthz responds with a simple health check.

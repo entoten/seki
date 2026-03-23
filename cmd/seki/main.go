@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Monet/seki/internal/config"
+	"github.com/Monet/seki/internal/crypto"
 	"github.com/Monet/seki/internal/server"
 )
 
@@ -45,7 +46,17 @@ func main() {
 	log.Printf("address:  %s", cfg.Server.Address)
 	log.Printf("database: %s", cfg.Database.Driver)
 
-	srv := server.New(cfg)
+	// Initialize the token signer.
+	signer, err := crypto.NewEd25519Signer(crypto.Ed25519SignerOptions{
+		KeyFile: cfg.Signing.KeyFile,
+		Issuer:  cfg.Server.Issuer,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error initializing signer: %v\n", err)
+		os.Exit(1)
+	}
+
+	srv := server.New(cfg, signer)
 
 	// Start server in a goroutine.
 	errCh := make(chan error, 1)
