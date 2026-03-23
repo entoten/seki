@@ -633,8 +633,303 @@ func scanCredentialRow(row scanner) (*storage.Credential, error) {
 }
 
 // ---------------------------------------------------------------------------
+// OrgStore
+// ---------------------------------------------------------------------------
+
+func (s *Store) CreateOrg(ctx context.Context, org *storage.Organization) error {
+	domains, _ := json.Marshal(org.Domains)
+	meta := normalizeJSON(org.Metadata)
+	now := timeStr(org.CreatedAt)
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO organizations (id, slug, name, domains, metadata, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		org.ID, org.Slug, org.Name, string(domains), meta, now, now,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("sqlite: create org: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetOrg(ctx context.Context, id string) (*storage.Organization, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, slug, name, domains, metadata, created_at, updated_at
+		 FROM organizations WHERE id = ?`, id)
+	return scanOrg(row)
+}
+
+func (s *Store) GetOrgBySlug(ctx context.Context, slug string) (*storage.Organization, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, slug, name, domains, metadata, created_at, updated_at
+		 FROM organizations WHERE slug = ?`, slug)
+	return scanOrg(row)
+}
+
+func (s *Store) UpdateOrg(ctx context.Context, org *storage.Organization) error {
+	domains, _ := json.Marshal(org.Domains)
+	meta := normalizeJSON(org.Metadata)
+	now := timeStr(time.Now().UTC())
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE organizations SET slug = ?, name = ?, domains = ?, metadata = ?, updated_at = ?
+		 WHERE id = ?`,
+		org.Slug, org.Name, string(domains), meta, now, org.ID,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("sqlite: update org: %w", err)
+	}
+	return checkRowsAffected(res, "organization")
+}
+
+func (s *Store) DeleteOrg(ctx context.Context, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM organizations WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("sqlite: delete org: %w", err)
+	}
+	return checkRowsAffected(res, "organization")
+}
+
+func (s *Store) ListOrgs(ctx context.Context, opts storage.ListOptions) ([]*storage.Organization, string, error) {
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = defaultLimit
+	}
+	var rows *sql.Rows
+	var err error
+	if opts.Cursor != "" {
+		rows, err = s.db.QueryContext(ctx,
+			`SELECT id, slug, name, domains, metadata, created_at, updated_at
+			 FROM organizations WHERE id > ? ORDER BY id ASC LIMIT ?`,
+			opts.Cursor, limit+1,
+		)
+	} else {
+		rows, err = s.db.QueryContext(ctx,
+			`SELECT id, slug, name, domains, metadata, created_at, updated_at
+			 FROM organizations ORDER BY id ASC LIMIT ?`,
+			limit+1,
+		)
+	}
+	if err != nil {
+		return nil, "", fmt.Errorf("sqlite: list orgs: %w", err)
+	}
+	defer rows.Close()
+
+	var orgs []*storage.Organization
+	for rows.Next() {
+		o, err := scanOrg(rows)
+		if err != nil {
+			return nil, "", err
+		}
+		orgs = append(orgs, o)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", fmt.Errorf("sqlite: list orgs rows: %w", err)
+	}
+
+	var nextCursor string
+	if len(orgs) > limit {
+		nextCursor = orgs[limit-1].ID
+		orgs = orgs[:limit]
+	}
+	return orgs, nextCursor, nil
+}
+
+func (s *Store) AddMember(ctx context.Context, member *storage.OrgMember) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO org_members (org_id, user_id, role, joined_at)
+		 VALUES (?, ?, ?, ?)`,
+		member.OrgID, member.UserID, member.Role, timeStr(member.JoinedAt),
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("sqlite: add member: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) RemoveMember(ctx context.Context, orgID, userID string) error {
+	res, err := s.db.ExecContext(ctx,
+		`DELETE FROM org_members WHERE org_id = ? AND user_id = ?`, orgID, userID)
+	if err != nil {
+		return fmt.Errorf("sqlite: remove member: %w", err)
+	}
+	return checkRowsAffected(res, "org member")
+}
+
+func (s *Store) ListMembers(ctx context.Context, orgID string) ([]*storage.OrgMember, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT org_id, user_id, role, joined_at
+		 FROM org_members WHERE org_id = ? ORDER BY joined_at ASC`, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("sqlite: list members: %w", err)
+	}
+	defer rows.Close()
+
+	var members []*storage.OrgMember
+	for rows.Next() {
+		m, err := scanMember(rows)
+		if err != nil {
+			return nil, err
+		}
+		members = append(members, m)
+	}
+	return members, rows.Err()
+}
+
+func (s *Store) GetMembership(ctx context.Context, orgID, userID string) (*storage.OrgMember, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT org_id, user_id, role, joined_at
+		 FROM org_members WHERE org_id = ? AND user_id = ?`, orgID, userID)
+	return scanMember(row)
+}
+
+func (s *Store) UpdateMemberRole(ctx context.Context, orgID, userID, role string) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE org_members SET role = ? WHERE org_id = ? AND user_id = ?`,
+		role, orgID, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("sqlite: update member role: %w", err)
+	}
+	return checkRowsAffected(res, "org member")
+}
+
+// ---------------------------------------------------------------------------
+// RoleStore
+// ---------------------------------------------------------------------------
+
+func (s *Store) CreateRole(ctx context.Context, role *storage.Role) error {
+	perms, _ := json.Marshal(role.Permissions)
+	now := timeStr(role.CreatedAt)
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO roles (id, org_id, name, permissions, created_at)
+		 VALUES (?, ?, ?, ?, ?)`,
+		role.ID, role.OrgID, role.Name, string(perms), now,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("sqlite: create role: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetRole(ctx context.Context, id string) (*storage.Role, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, org_id, name, permissions, created_at
+		 FROM roles WHERE id = ?`, id)
+	return scanRole(row)
+}
+
+func (s *Store) GetRoleByName(ctx context.Context, orgID, name string) (*storage.Role, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, org_id, name, permissions, created_at
+		 FROM roles WHERE org_id = ? AND name = ?`, orgID, name)
+	return scanRole(row)
+}
+
+func (s *Store) ListRoles(ctx context.Context, orgID string) ([]*storage.Role, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, org_id, name, permissions, created_at
+		 FROM roles WHERE org_id = ? ORDER BY name ASC`, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("sqlite: list roles: %w", err)
+	}
+	defer rows.Close()
+
+	var roles []*storage.Role
+	for rows.Next() {
+		r, err := scanRole(rows)
+		if err != nil {
+			return nil, err
+		}
+		roles = append(roles, r)
+	}
+	return roles, rows.Err()
+}
+
+func (s *Store) UpdateRole(ctx context.Context, role *storage.Role) error {
+	perms, _ := json.Marshal(role.Permissions)
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE roles SET name = ?, permissions = ? WHERE id = ?`,
+		role.Name, string(perms), role.ID,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("sqlite: update role: %w", err)
+	}
+	return checkRowsAffected(res, "role")
+}
+
+func (s *Store) DeleteRole(ctx context.Context, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM roles WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("sqlite: delete role: %w", err)
+	}
+	return checkRowsAffected(res, "role")
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+func scanOrg(row scanner) (*storage.Organization, error) {
+	var o storage.Organization
+	var domains, meta string
+	var createdAt, updatedAt string
+	err := row.Scan(&o.ID, &o.Slug, &o.Name, &domains, &meta, &createdAt, &updatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("sqlite: scan org: %w", err)
+	}
+	_ = json.Unmarshal([]byte(domains), &o.Domains)
+	o.Metadata = json.RawMessage(meta)
+	o.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	o.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+	return &o, nil
+}
+
+func scanMember(row scanner) (*storage.OrgMember, error) {
+	var m storage.OrgMember
+	var joinedAt string
+	err := row.Scan(&m.OrgID, &m.UserID, &m.Role, &joinedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("sqlite: scan org member: %w", err)
+	}
+	m.JoinedAt, _ = time.Parse(time.RFC3339, joinedAt)
+	return &m, nil
+}
+
+func scanRole(row scanner) (*storage.Role, error) {
+	var r storage.Role
+	var perms string
+	var createdAt string
+	err := row.Scan(&r.ID, &r.OrgID, &r.Name, &perms, &createdAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("sqlite: scan role: %w", err)
+	}
+	_ = json.Unmarshal([]byte(perms), &r.Permissions)
+	r.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	return &r, nil
+}
 
 type scanner interface {
 	Scan(dest ...any) error

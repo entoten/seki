@@ -14,6 +14,8 @@ import (
 	"github.com/Monet/seki/internal/config"
 	"github.com/Monet/seki/internal/crypto"
 	"github.com/Monet/seki/internal/server"
+	"github.com/Monet/seki/internal/storage"
+	_ "github.com/Monet/seki/internal/storage/sqlite"
 )
 
 var version = "0.1.0-dev"
@@ -56,7 +58,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	srv := server.New(cfg, signer)
+	// Initialize the storage layer.
+	store, err := storage.New(cfg.Database)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error initializing storage: %v\n", err)
+		os.Exit(1)
+	}
+	defer store.Close()
+
+	if err := store.Migrate(); err != nil {
+		fmt.Fprintf(os.Stderr, "error running migrations: %v\n", err)
+		os.Exit(1)
+	}
+
+	srv := server.New(cfg, store, signer)
 
 	// Start server in a goroutine.
 	errCh := make(chan error, 1)

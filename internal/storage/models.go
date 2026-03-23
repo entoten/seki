@@ -115,3 +115,31 @@ type AuditListOptions struct {
 	ActorID  string // optional filter
 	Action   string // optional filter
 }
+
+// Organization represents a tenant/organization.
+type Organization struct {
+	ID        string          `json:"id"`
+	Slug      string          `json:"slug"`
+	Name      string          `json:"name"`
+	Domains   []string        `json:"domains"`
+	Metadata  json.RawMessage `json:"metadata"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}
+
+// OrgMember represents a user's membership in an organization.
+type OrgMember struct {
+	OrgID    string    `json:"org_id"`
+	UserID   string    `json:"user_id"`
+	Role     string    `json:"role"`
+	JoinedAt time.Time `json:"joined_at"`
+}
+
+// Role represents a named role with permissions within an organization.
+type Role struct {
+	ID          string    `json:"id"`
+	OrgID       string    `json:"org_id"`
+	Name        string    `json:"name"`
+	Permissions []string  `json:"permissions"`
+	CreatedAt   time.Time `json:"created_at"`
+}

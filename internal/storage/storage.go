@@ -21,6 +21,8 @@ type Storage interface {
 	AuthCodeStore
 	RefreshTokenStore
 	CredentialStore
+	OrgStore
+	RoleStore
 	Migrate() error
 	Close() error
 	Ping(ctx context.Context) error
@@ -87,4 +89,30 @@ type RefreshTokenStore interface {
 	DeleteRefreshToken(ctx context.Context, id string) error
 	DeleteRefreshTokensByFamily(ctx context.Context, family string) (int64, error)
 	DeleteRefreshTokensByUserID(ctx context.Context, userID string) (int64, error)
+}
+
+// OrgStore defines operations on organizations and their members.
+type OrgStore interface {
+	CreateOrg(ctx context.Context, org *Organization) error
+	GetOrg(ctx context.Context, id string) (*Organization, error)
+	GetOrgBySlug(ctx context.Context, slug string) (*Organization, error)
+	UpdateOrg(ctx context.Context, org *Organization) error
+	DeleteOrg(ctx context.Context, id string) error
+	ListOrgs(ctx context.Context, opts ListOptions) ([]*Organization, string, error)
+
+	AddMember(ctx context.Context, member *OrgMember) error
+	RemoveMember(ctx context.Context, orgID, userID string) error
+	ListMembers(ctx context.Context, orgID string) ([]*OrgMember, error)
+	GetMembership(ctx context.Context, orgID, userID string) (*OrgMember, error)
+	UpdateMemberRole(ctx context.Context, orgID, userID, role string) error
+}
+
+// RoleStore defines operations on roles within organizations.
+type RoleStore interface {
+	CreateRole(ctx context.Context, role *Role) error
+	GetRole(ctx context.Context, id string) (*Role, error)
+	GetRoleByName(ctx context.Context, orgID, name string) (*Role, error)
+	ListRoles(ctx context.Context, orgID string) ([]*Role, error)
+	UpdateRole(ctx context.Context, role *Role) error
+	DeleteRole(ctx context.Context, id string) error
 }

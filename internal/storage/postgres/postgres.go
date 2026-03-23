@@ -45,6 +45,7 @@ func (s *Store) Migrate() error {
 		"migrations/002_authorization_codes.up.sql",
 		"migrations/003_refresh_tokens.up.sql",
 		"migrations/004_credentials_webauthn.up.sql",
+		"migrations/005_organizations.up.sql",
 	}
 	for _, name := range migrations {
 		data, err := migrationsFS.ReadFile(name)
@@ -641,6 +642,324 @@ func (s *Store) DeleteCredentialsByUserAndType(ctx context.Context, userID strin
 		return fmt.Errorf("postgres: delete credentials by user and type: %w", err)
 	}
 	return nil
+}
+
+// ---------------------------------------------------------------------------
+// OrgStore
+// ---------------------------------------------------------------------------
+
+func (s *Store) CreateOrg(ctx context.Context, org *storage.Organization) error {
+	domains, _ := json.Marshal(org.Domains)
+	meta := normalizeJSON(org.Metadata)
+	now := org.CreatedAt.UTC()
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO organizations (id, slug, name, domains, metadata, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		org.ID, org.Slug, org.Name, string(domains), meta, now, now,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("postgres: create org: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetOrg(ctx context.Context, id string) (*storage.Organization, error) {
+	row := s.pool.QueryRow(ctx,
+		`SELECT id, slug, name, domains, metadata, created_at, updated_at
+		 FROM organizations WHERE id = $1`, id)
+	return scanOrgPgx(row)
+}
+
+func (s *Store) GetOrgBySlug(ctx context.Context, slug string) (*storage.Organization, error) {
+	row := s.pool.QueryRow(ctx,
+		`SELECT id, slug, name, domains, metadata, created_at, updated_at
+		 FROM organizations WHERE slug = $1`, slug)
+	return scanOrgPgx(row)
+}
+
+func (s *Store) UpdateOrg(ctx context.Context, org *storage.Organization) error {
+	domains, _ := json.Marshal(org.Domains)
+	meta := normalizeJSON(org.Metadata)
+	now := time.Now().UTC()
+	ct, err := s.pool.Exec(ctx,
+		`UPDATE organizations SET slug = $1, name = $2, domains = $3, metadata = $4, updated_at = $5
+		 WHERE id = $6`,
+		org.Slug, org.Name, string(domains), meta, now, org.ID,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("postgres: update org: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DeleteOrg(ctx context.Context, id string) error {
+	ct, err := s.pool.Exec(ctx, `DELETE FROM organizations WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("postgres: delete org: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) ListOrgs(ctx context.Context, opts storage.ListOptions) ([]*storage.Organization, string, error) {
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = defaultLimit
+	}
+	var rows pgx.Rows
+	var err error
+	if opts.Cursor != "" {
+		rows, err = s.pool.Query(ctx,
+			`SELECT id, slug, name, domains, metadata, created_at, updated_at
+			 FROM organizations WHERE id > $1 ORDER BY id ASC LIMIT $2`,
+			opts.Cursor, limit+1,
+		)
+	} else {
+		rows, err = s.pool.Query(ctx,
+			`SELECT id, slug, name, domains, metadata, created_at, updated_at
+			 FROM organizations ORDER BY id ASC LIMIT $1`,
+			limit+1,
+		)
+	}
+	if err != nil {
+		return nil, "", fmt.Errorf("postgres: list orgs: %w", err)
+	}
+	defer rows.Close()
+
+	var orgs []*storage.Organization
+	for rows.Next() {
+		o, err := scanOrgPgxRows(rows)
+		if err != nil {
+			return nil, "", err
+		}
+		orgs = append(orgs, o)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", fmt.Errorf("postgres: list orgs rows: %w", err)
+	}
+
+	var nextCursor string
+	if len(orgs) > limit {
+		nextCursor = orgs[limit-1].ID
+		orgs = orgs[:limit]
+	}
+	return orgs, nextCursor, nil
+}
+
+func (s *Store) AddMember(ctx context.Context, member *storage.OrgMember) error {
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO org_members (org_id, user_id, role, joined_at)
+		 VALUES ($1, $2, $3, $4)`,
+		member.OrgID, member.UserID, member.Role, member.JoinedAt.UTC(),
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("postgres: add member: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) RemoveMember(ctx context.Context, orgID, userID string) error {
+	ct, err := s.pool.Exec(ctx,
+		`DELETE FROM org_members WHERE org_id = $1 AND user_id = $2`, orgID, userID)
+	if err != nil {
+		return fmt.Errorf("postgres: remove member: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) ListMembers(ctx context.Context, orgID string) ([]*storage.OrgMember, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT org_id, user_id, role, joined_at
+		 FROM org_members WHERE org_id = $1 ORDER BY joined_at ASC`, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: list members: %w", err)
+	}
+	defer rows.Close()
+
+	var members []*storage.OrgMember
+	for rows.Next() {
+		var m storage.OrgMember
+		err := rows.Scan(&m.OrgID, &m.UserID, &m.Role, &m.JoinedAt)
+		if err != nil {
+			return nil, fmt.Errorf("postgres: scan org member: %w", err)
+		}
+		members = append(members, &m)
+	}
+	return members, rows.Err()
+}
+
+func (s *Store) GetMembership(ctx context.Context, orgID, userID string) (*storage.OrgMember, error) {
+	row := s.pool.QueryRow(ctx,
+		`SELECT org_id, user_id, role, joined_at
+		 FROM org_members WHERE org_id = $1 AND user_id = $2`, orgID, userID)
+	var m storage.OrgMember
+	err := row.Scan(&m.OrgID, &m.UserID, &m.Role, &m.JoinedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("postgres: scan membership: %w", err)
+	}
+	return &m, nil
+}
+
+func (s *Store) UpdateMemberRole(ctx context.Context, orgID, userID, role string) error {
+	ct, err := s.pool.Exec(ctx,
+		`UPDATE org_members SET role = $1 WHERE org_id = $2 AND user_id = $3`,
+		role, orgID, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("postgres: update member role: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// RoleStore
+// ---------------------------------------------------------------------------
+
+func (s *Store) CreateRole(ctx context.Context, role *storage.Role) error {
+	perms, _ := json.Marshal(role.Permissions)
+	now := role.CreatedAt.UTC()
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO roles (id, org_id, name, permissions, created_at)
+		 VALUES ($1, $2, $3, $4, $5)`,
+		role.ID, role.OrgID, role.Name, string(perms), now,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("postgres: create role: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetRole(ctx context.Context, id string) (*storage.Role, error) {
+	row := s.pool.QueryRow(ctx,
+		`SELECT id, org_id, name, permissions, created_at
+		 FROM roles WHERE id = $1`, id)
+	return scanRolePgx(row)
+}
+
+func (s *Store) GetRoleByName(ctx context.Context, orgID, name string) (*storage.Role, error) {
+	row := s.pool.QueryRow(ctx,
+		`SELECT id, org_id, name, permissions, created_at
+		 FROM roles WHERE org_id = $1 AND name = $2`, orgID, name)
+	return scanRolePgx(row)
+}
+
+func (s *Store) ListRoles(ctx context.Context, orgID string) ([]*storage.Role, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT id, org_id, name, permissions, created_at
+		 FROM roles WHERE org_id = $1 ORDER BY name ASC`, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: list roles: %w", err)
+	}
+	defer rows.Close()
+
+	var roles []*storage.Role
+	for rows.Next() {
+		var r storage.Role
+		var perms []byte
+		err := rows.Scan(&r.ID, &r.OrgID, &r.Name, &perms, &r.CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("postgres: scan role: %w", err)
+		}
+		_ = json.Unmarshal(perms, &r.Permissions)
+		roles = append(roles, &r)
+	}
+	return roles, rows.Err()
+}
+
+func (s *Store) UpdateRole(ctx context.Context, role *storage.Role) error {
+	perms, _ := json.Marshal(role.Permissions)
+	ct, err := s.pool.Exec(ctx,
+		`UPDATE roles SET name = $1, permissions = $2 WHERE id = $3`,
+		role.Name, string(perms), role.ID,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("postgres: update role: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DeleteRole(ctx context.Context, id string) error {
+	ct, err := s.pool.Exec(ctx, `DELETE FROM roles WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("postgres: delete role: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
+}
+
+func scanOrgPgx(row pgx.Row) (*storage.Organization, error) {
+	var o storage.Organization
+	var domains, meta []byte
+	err := row.Scan(&o.ID, &o.Slug, &o.Name, &domains, &meta, &o.CreatedAt, &o.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("postgres: scan org: %w", err)
+	}
+	_ = json.Unmarshal(domains, &o.Domains)
+	o.Metadata = json.RawMessage(meta)
+	return &o, nil
+}
+
+func scanOrgPgxRows(rows pgx.Rows) (*storage.Organization, error) {
+	var o storage.Organization
+	var domains, meta []byte
+	err := rows.Scan(&o.ID, &o.Slug, &o.Name, &domains, &meta, &o.CreatedAt, &o.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: scan org: %w", err)
+	}
+	_ = json.Unmarshal(domains, &o.Domains)
+	o.Metadata = json.RawMessage(meta)
+	return &o, nil
+}
+
+func scanRolePgx(row pgx.Row) (*storage.Role, error) {
+	var r storage.Role
+	var perms []byte
+	err := row.Scan(&r.ID, &r.OrgID, &r.Name, &perms, &r.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("postgres: scan role: %w", err)
+	}
+	_ = json.Unmarshal(perms, &r.Permissions)
+	return &r, nil
 }
 
 func scanCredentialPgx(row pgx.Row) (*storage.Credential, error) {
