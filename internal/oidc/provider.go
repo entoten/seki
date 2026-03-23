@@ -45,4 +45,5 @@ func (p *Provider) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /.well-known/jwks.json", p.handleJWKS)
 	mux.HandleFunc("GET /authorize", p.handleAuthorize)
 	mux.HandleFunc("POST /token", p.handleToken)
+	mux.HandleFunc("GET /userinfo", p.handleUserInfo)
 }

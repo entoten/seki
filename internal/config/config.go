@@ -34,6 +34,7 @@ type SigningConfig struct {
 type ClientConfig struct {
 	ID           string   `yaml:"id"`
 	Name         string   `yaml:"name"`
+	Secret       string   `yaml:"secret"`
 	RedirectURIs []string `yaml:"redirect_uris"`
 	GrantTypes   []string `yaml:"grant_types"`
 	Scopes       []string `yaml:"scopes"`
