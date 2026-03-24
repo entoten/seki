@@ -24,6 +24,18 @@ func (p *Provider) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	defer span.End()
 	r = r.WithContext(ctx)
 
+	// --- Check for Pushed Authorization Request (PAR) ---
+	if client, parReq, handled := p.resolveAuthorizeParamsFromPAR(w, r); handled {
+		if parReq == nil {
+			// Error was already written by resolveAuthorizeParamsFromPAR.
+			return
+		}
+		// Use PAR-stored parameters.
+		p.completeAuthorize(w, r, client, parReq.RedirectURI, parReq.Scope, parReq.State,
+			parReq.Nonce, parReq.CodeChallenge, parReq.CodeChallengeMethod, parReq.ACRValues)
+		return
+	}
+
 	q := r.URL.Query()
 
 	clientID := q.Get("client_id")
@@ -149,6 +161,87 @@ func (p *Provider) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	authCode := &storage.AuthCode{
 		Code:                code,
 		ClientID:            clientID,
+		UserID:              sess.UserID,
+		RedirectURI:         redirectURI,
+		Scopes:              scopes,
+		CodeChallenge:       codeChallenge,
+		CodeChallengeMethod: codeChallengeMethod,
+		Nonce:               nonce,
+		State:               state,
+		ACR:                 acr,
+		ExpiresAt:           now.Add(authCodeTTL),
+		CreatedAt:           now,
+	}
+
+	if err := p.store.CreateAuthCode(r.Context(), authCode); err != nil {
+		redirectWithError(w, r, parsed, state, "server_error", "failed to store authorization code")
+		return
+	}
+
+	// --- Redirect with code ---
+	rq := parsed.Query()
+	rq.Set("code", code)
+	if state != "" {
+		rq.Set("state", state)
+	}
+	parsed.RawQuery = rq.Encode()
+
+	http.Redirect(w, r, parsed.String(), http.StatusFound)
+}
+
+// completeAuthorize handles the authorize flow using pre-validated parameters (from PAR).
+func (p *Provider) completeAuthorize(w http.ResponseWriter, r *http.Request, client *storage.Client, redirectURI, scope, state, nonce, codeChallenge, codeChallengeMethod, acrValues string) {
+	parsed, err := url.Parse(redirectURI)
+	if err != nil {
+		renderError(w, http.StatusBadRequest, "invalid_request", "malformed redirect_uri")
+		return
+	}
+
+	scopes := parseScopes(scope)
+
+	// --- Check for active session ---
+	if p.sessions == nil {
+		redirectWithError(w, r, parsed, state, "login_required", "no session manager configured")
+		return
+	}
+
+	sessionID, err := p.sessions.GetSessionID(r)
+	if err != nil {
+		p.redirectToLogin(w, r)
+		return
+	}
+
+	sess, err := p.sessions.Get(r.Context(), sessionID)
+	if err != nil {
+		p.redirectToLogin(w, r)
+		return
+	}
+
+	// --- Check acr_values for step-up MFA ---
+	mfaRequired := containsACR(acrValues, ACRMFA)
+	mfaVerified := sessionHasMFA(sess)
+
+	if mfaRequired && !mfaVerified {
+		p.redirectToMFA(w, r)
+		return
+	}
+
+	// --- Generate authorization code ---
+	code, err := generateAuthCode()
+	if err != nil {
+		redirectWithError(w, r, parsed, state, "server_error", "failed to generate authorization code")
+		return
+	}
+
+	acr := ACRBasic
+	if mfaVerified {
+		acr = ACRMFA
+	}
+
+	now := time.Now().UTC()
+	authCode := &storage.AuthCode{
+		Code:                code,
+		ClientID:            client.ID,
 		UserID:              sess.UserID,
 		RedirectURI:         redirectURI,
 		Scopes:              scopes,

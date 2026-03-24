@@ -26,7 +26,10 @@ func (p *Provider) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 		"code_challenge_methods_supported":      []string{"S256"},
 		"introspection_endpoint":                issuer + "/introspect",
 		"revocation_endpoint":                   issuer + "/revoke",
-		"acr_values_supported":                  []string{ACRBasic, ACRMFA},
+		"acr_values_supported":                          []string{ACRBasic, ACRMFA},
+		"dpop_signing_alg_values_supported":              []string{"ES256", "EdDSA"},
+		"pushed_authorization_request_endpoint":          issuer + "/par",
+		"require_pushed_authorization_requests":          false,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

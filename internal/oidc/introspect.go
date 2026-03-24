@@ -90,10 +90,41 @@ func (p *Provider) introspectAccessToken(w http.ResponseWriter, token string) bo
 		return false
 	}
 
+	// Determine token type based on cnf claim.
+	tokenType := "Bearer"
+	if cnf, ok := claims["cnf"]; ok {
+		tokenType = "DPoP"
+		resp := map[string]interface{}{
+			"active":     true,
+			"token_type": tokenType,
+			"cnf":        cnf,
+		}
+		if sub, ok := claims["sub"]; ok {
+			resp["sub"] = sub
+		}
+		if scope, ok := claims["scope"]; ok {
+			resp["scope"] = scope
+		}
+		if aud, ok := claims["aud"]; ok {
+			resp["client_id"] = aud
+		}
+		if exp, ok := claims["exp"]; ok {
+			resp["exp"] = exp
+		}
+		if iat, ok := claims["iat"]; ok {
+			resp["iat"] = iat
+		}
+		if iss, ok := claims["iss"]; ok {
+			resp["iss"] = iss
+		}
+		writeIntrospectResponse(w, resp)
+		return true
+	}
+
 	// Build introspection response from JWT claims.
 	resp := map[string]interface{}{
 		"active":     true,
-		"token_type": "Bearer",
+		"token_type": tokenType,
 	}
 
 	if sub, ok := claims["sub"]; ok {

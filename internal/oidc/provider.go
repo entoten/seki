@@ -18,14 +18,18 @@ type Provider struct {
 	sessions    *session.Manager
 	authnConfig config.AuthenticationConfig
 	limiter     *ratelimit.Limiter
+	dpopNonces  *dpopNonceStore
+	parStore    *parStore
 }
 
 // NewProvider creates a new OIDC Provider.
 func NewProvider(issuer string, signer crypto.Signer, store storage.Storage, opts ...ProviderOption) *Provider {
 	p := &Provider{
-		issuer: issuer,
-		signer: signer,
-		store:  store,
+		issuer:     issuer,
+		signer:     signer,
+		store:      store,
+		dpopNonces: newDPoPNonceStore(),
+		parStore:   newPARStore(),
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -73,6 +77,9 @@ func (p *Provider) RegisterRoutes(mux *http.ServeMux) {
 	// MFA step-up routes.
 	mux.HandleFunc("GET /mfa", p.handleMFAPage)
 	mux.HandleFunc("POST /mfa", p.handleMFASubmit)
+
+	// Pushed Authorization Requests (RFC 9126).
+	mux.HandleFunc("POST /par", p.handlePAR)
 
 	// Token introspection (RFC 7662) and revocation (RFC 7009).
 	mux.HandleFunc("POST /introspect", p.handleIntrospect)

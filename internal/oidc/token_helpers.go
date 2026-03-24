@@ -15,6 +15,11 @@ import (
 
 // generateAccessToken creates a signed JWT access token.
 func (p *Provider) generateAccessToken(sub, clientID string, scopes []string, now time.Time) (string, error) {
+	return p.generateAccessTokenWithDPoP(sub, clientID, scopes, now, "")
+}
+
+// generateAccessTokenWithDPoP creates a signed JWT access token, optionally binding it to a DPoP key.
+func (p *Provider) generateAccessTokenWithDPoP(sub, clientID string, scopes []string, now time.Time, dpopJKT string) (string, error) {
 	claims := map[string]interface{}{
 		"sub":   sub,
 		"aud":   clientID,
@@ -23,6 +28,11 @@ func (p *Provider) generateAccessToken(sub, clientID string, scopes []string, no
 		"exp":   now.Add(accessTokenTTL).Unix(),
 		"iss":   p.issuer,
 		"typ":   "access_token",
+	}
+	if dpopJKT != "" {
+		claims["cnf"] = map[string]string{
+			"jkt": dpopJKT,
+		}
 	}
 	return p.signer.Sign(claims)
 }

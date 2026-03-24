@@ -115,6 +115,14 @@ func (p *Provider) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.R
 		}
 	}
 
+	// Validate DPoP proof if present.
+	tokenEndpointURL := strings.TrimRight(p.issuer, "/") + "/token"
+	dpop, err := p.validateDPoP(r, http.MethodPost, tokenEndpointURL)
+	if err != nil {
+		tokenError(w, http.StatusBadRequest, "invalid_dpop_proof", err.Error())
+		return
+	}
+
 	// Look up user for id_token claims.
 	user, err := p.store.GetUser(ctx, authCode.UserID)
 	if err != nil {
@@ -124,8 +132,12 @@ func (p *Provider) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.R
 
 	now := time.Now().UTC()
 
-	// Generate access token.
-	accessToken, err := p.generateAccessToken(user.ID, client.ID, authCode.Scopes, now)
+	// Generate access token (optionally DPoP-bound).
+	var dpopJKT string
+	if dpop.present {
+		dpopJKT = dpop.jkt
+	}
+	accessToken, err := p.generateAccessTokenWithDPoP(user.ID, client.ID, authCode.Scopes, now, dpopJKT)
 	if err != nil {
 		tokenError(w, http.StatusInternalServerError, "server_error", "failed to generate access token")
 		return
@@ -164,7 +176,11 @@ func (p *Provider) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	writeTokenResponse(w, accessToken, idToken, rawRefresh, int(accessTokenTTL.Seconds()))
+	tokenType := "Bearer"
+	if dpop.present {
+		tokenType = "DPoP"
+	}
+	writeTokenResponseWithType(w, accessToken, idToken, rawRefresh, tokenType, int(accessTokenTTL.Seconds()))
 }
 
 // handleClientCredentialsGrant handles machine-to-machine token requests.
@@ -182,19 +198,35 @@ func (p *Provider) handleClientCredentialsGrant(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// Validate DPoP proof if present.
+	tokenEndpointURL := strings.TrimRight(p.issuer, "/") + "/token"
+	dpop, err := p.validateDPoP(r, http.MethodPost, tokenEndpointURL)
+	if err != nil {
+		tokenError(w, http.StatusBadRequest, "invalid_dpop_proof", err.Error())
+		return
+	}
+
 	now := time.Now().UTC()
 
 	scope := r.PostFormValue("scope")
 	scopes := parseScopes(scope)
 
-	accessToken, err := p.generateAccessToken(client.ID, client.ID, scopes, now)
+	var dpopJKT string
+	if dpop.present {
+		dpopJKT = dpop.jkt
+	}
+	accessToken, err := p.generateAccessTokenWithDPoP(client.ID, client.ID, scopes, now, dpopJKT)
 	if err != nil {
 		tokenError(w, http.StatusInternalServerError, "server_error", "failed to generate access token")
 		return
 	}
 
+	tokenType := "Bearer"
+	if dpop.present {
+		tokenType = "DPoP"
+	}
 	// client_credentials: no id_token, no refresh_token.
-	writeTokenResponse(w, accessToken, "", "", int(accessTokenTTL.Seconds()))
+	writeTokenResponseWithType(w, accessToken, "", "", tokenType, int(accessTokenTTL.Seconds()))
 }
 
 // consumedTokenTime is the sentinel expiry used to mark a refresh token as consumed.
@@ -276,6 +308,14 @@ func (p *Provider) handleRefreshTokenGrant(w http.ResponseWriter, r *http.Reques
 	}
 	_ = p.store.CreateRefreshToken(ctx, consumedRT)
 
+	// Validate DPoP proof if present.
+	tokenEndpointURL := strings.TrimRight(p.issuer, "/") + "/token"
+	dpopRes, dpopErr := p.validateDPoP(r, http.MethodPost, tokenEndpointURL)
+	if dpopErr != nil {
+		tokenError(w, http.StatusBadRequest, "invalid_dpop_proof", dpopErr.Error())
+		return
+	}
+
 	// Look up user.
 	user, err := p.store.GetUser(ctx, rt.UserID)
 	if err != nil {
@@ -292,8 +332,12 @@ func (p *Provider) handleRefreshTokenGrant(w http.ResponseWriter, r *http.Reques
 
 	now := time.Now().UTC()
 
-	// Generate new access token.
-	accessToken, err := p.generateAccessToken(user.ID, client.ID, rt.Scopes, now)
+	// Generate new access token (optionally DPoP-bound).
+	var dpopJKT string
+	if dpopRes.present {
+		dpopJKT = dpopRes.jkt
+	}
+	accessToken, err := p.generateAccessTokenWithDPoP(user.ID, client.ID, rt.Scopes, now, dpopJKT)
 	if err != nil {
 		tokenError(w, http.StatusInternalServerError, "server_error", "failed to generate access token")
 		return
@@ -328,7 +372,11 @@ func (p *Provider) handleRefreshTokenGrant(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	writeTokenResponse(w, accessToken, idToken, newRawRefresh, int(accessTokenTTL.Seconds()))
+	tokenType := "Bearer"
+	if dpopRes.present {
+		tokenType = "DPoP"
+	}
+	writeTokenResponseWithType(w, accessToken, idToken, newRawRefresh, tokenType, int(accessTokenTTL.Seconds()))
 }
 
 // authenticateClient identifies the client from the request. It supports
@@ -459,9 +507,14 @@ func tokenError(w http.ResponseWriter, status int, errCode, description string) 
 
 // writeTokenResponse writes the successful token response.
 func writeTokenResponse(w http.ResponseWriter, accessToken, idToken, refreshToken string, expiresIn int) {
+	writeTokenResponseWithType(w, accessToken, idToken, refreshToken, "Bearer", expiresIn)
+}
+
+// writeTokenResponseWithType writes the successful token response with the given token_type.
+func writeTokenResponseWithType(w http.ResponseWriter, accessToken, idToken, refreshToken, tokenType string, expiresIn int) {
 	resp := map[string]interface{}{
 		"access_token": accessToken,
-		"token_type":   "Bearer",
+		"token_type":   tokenType,
 		"expires_in":   expiresIn,
 	}
 	if idToken != "" {

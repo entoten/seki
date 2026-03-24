@@ -116,6 +116,17 @@ func (h *Argon2idHasher) Verify(password, hash string) error {
 		return fmt.Errorf("parsing argon2id parameters: %w", err)
 	}
 
+	// Validate parameters to prevent panics from the argon2 library.
+	if time < 1 {
+		return errors.New("invalid argon2id parameters: time must be >= 1")
+	}
+	if memory < 8*uint32(threads) {
+		return errors.New("invalid argon2id parameters: memory too small")
+	}
+	if threads < 1 {
+		return errors.New("invalid argon2id parameters: threads must be >= 1")
+	}
+
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
 	if err != nil {
 		return fmt.Errorf("decoding salt: %w", err)
@@ -127,7 +138,7 @@ func (h *Argon2idHasher) Verify(password, hash string) error {
 	}
 
 	expectedLen := len(expectedKey)
-	if expectedLen < 0 || expectedLen > int(^uint32(0)) {
+	if expectedLen <= 0 || expectedLen > int(^uint32(0)) {
 		return errors.New("invalid hash length")
 	}
 	keyLen := uint32(expectedLen) // #nosec G115 -- bounds checked above
