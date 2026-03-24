@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "seki-client"
+version = "0.1.0"
+description = "Python client SDK for the seki authentication server Admin API"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+dependencies = ["httpx>=0.24"]
+
+[project.urls]
+Homepage = "https://github.com/entoten/seki"
+Repository = "https://github.com/entoten/seki"
+Documentation = "https://github.com/entoten/seki/tree/main/sdks/python"
+
+[tool.hatch.build.targets.wheel]
+packages = ["seki"]

@@ -43,6 +43,9 @@ jobs:
       - name: Test
         run: go test -v -race -coverprofile=coverage.out ./...
 
+      - name: OIDC Conformance
+        run: go test -v -run TestOIDCConformance ./internal/oidc/...
+
       - name: Check coverage threshold
         run: |
           # Use cross-package coverage to properly measure code exercised across
