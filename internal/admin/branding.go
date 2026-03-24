@@ -19,10 +19,10 @@ func (h *Handler) handleGetBranding(w http.ResponseWriter, r *http.Request) {
 	org, err := h.store.GetOrgBySlug(r.Context(), slug)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "organization not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeOrgNotFound, "organization not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to get organization")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get organization")
 		return
 	}
 	writeJSON(w, http.StatusOK, org.Branding)
@@ -40,16 +40,16 @@ func (h *Handler) handleUpdateBranding(w http.ResponseWriter, r *http.Request) {
 	org, err := h.store.GetOrgBySlug(r.Context(), slug)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "organization not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeOrgNotFound, "organization not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to get organization")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get organization")
 		return
 	}
 
 	var req updateBrandingRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeProblem(w, http.StatusBadRequest, "invalid request body")
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid request body")
 		return
 	}
 
@@ -67,7 +67,7 @@ func (h *Handler) handleUpdateBranding(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.store.UpdateOrg(r.Context(), org); err != nil {
-		writeProblem(w, http.StatusInternalServerError, "failed to update branding")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to update branding")
 		return
 	}
 

@@ -74,6 +74,10 @@ func (p *Provider) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /mfa", p.handleMFAPage)
 	mux.HandleFunc("POST /mfa", p.handleMFASubmit)
 
+	// Token introspection (RFC 7662) and revocation (RFC 7009).
+	mux.HandleFunc("POST /introspect", p.handleIntrospect)
+	mux.HandleFunc("POST /revoke", p.handleRevoke)
+
 	// Device authorization grant (RFC 8628).
 	p.RegisterDeviceRoutes(mux)
 }

@@ -57,12 +57,12 @@ func (h *Handler) handleImportUsersJSON(w http.ResponseWriter, r *http.Request) 
 
 	var records []importUserRecord
 	if err := json.NewDecoder(r.Body).Decode(&records); err != nil {
-		writeProblem(w, http.StatusBadRequest, "invalid JSON body: "+err.Error())
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid JSON body: "+err.Error())
 		return
 	}
 
 	if len(records) > maxImportUsers {
-		writeProblem(w, http.StatusBadRequest, fmt.Sprintf("too many users: %d exceeds maximum of %d", len(records), maxImportUsers))
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, fmt.Sprintf("too many users: %d exceeds maximum of %d", len(records), maxImportUsers))
 		return
 	}
 
@@ -81,7 +81,7 @@ func (h *Handler) handleImportUsersCSV(w http.ResponseWriter, r *http.Request) {
 	// Read header row.
 	header, err := reader.Read()
 	if err != nil {
-		writeProblem(w, http.StatusBadRequest, "failed to read CSV header: "+err.Error())
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, "failed to read CSV header: "+err.Error())
 		return
 	}
 
@@ -92,7 +92,7 @@ func (h *Handler) handleImportUsersCSV(w http.ResponseWriter, r *http.Request) {
 
 	emailIdx, hasEmail := colIndex["email"]
 	if !hasEmail {
-		writeProblem(w, http.StatusBadRequest, "CSV must have an 'email' column")
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, "CSV must have an 'email' column")
 		return
 	}
 	displayNameIdx, hasDisplayName := colIndex["display_name"]
@@ -107,7 +107,7 @@ func (h *Handler) handleImportUsersCSV(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if err != nil {
-			writeProblem(w, http.StatusBadRequest, fmt.Sprintf("CSV parse error at line %d: %s", lineNum, err.Error()))
+			writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, fmt.Sprintf("CSV parse error at line %d: %s", lineNum, err.Error()))
 			return
 		}
 
@@ -126,7 +126,7 @@ func (h *Handler) handleImportUsersCSV(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(records) > maxImportUsers {
-		writeProblem(w, http.StatusBadRequest, fmt.Sprintf("too many users: %d exceeds maximum of %d", len(records), maxImportUsers))
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, fmt.Sprintf("too many users: %d exceeds maximum of %d", len(records), maxImportUsers))
 		return
 	}
 

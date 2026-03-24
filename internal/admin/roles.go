@@ -30,20 +30,20 @@ func (h *Handler) handleCreateRole(w http.ResponseWriter, r *http.Request) {
 	org, err := h.store.GetOrgBySlug(r.Context(), slug)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "organization not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeOrgNotFound, "organization not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to get organization")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get organization")
 		return
 	}
 
 	var req createRoleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeProblem(w, http.StatusBadRequest, "invalid request body")
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid request body")
 		return
 	}
 	if err := validate.Name(req.Name); err != nil {
-		writeProblem(w, http.StatusBadRequest, err.Error())
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, err.Error())
 		return
 	}
 	if req.ID == "" {
@@ -63,10 +63,10 @@ func (h *Handler) handleCreateRole(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.store.CreateRole(r.Context(), role); err != nil {
 		if errors.Is(err, storage.ErrAlreadyExists) {
-			writeProblem(w, http.StatusConflict, "role already exists")
+			writeProblem(w, r, http.StatusConflict, ErrCodeConflict, "role already exists")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to create role")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to create role")
 		return
 	}
 
@@ -82,16 +82,16 @@ func (h *Handler) handleListRoles(w http.ResponseWriter, r *http.Request) {
 	org, err := h.store.GetOrgBySlug(r.Context(), slug)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "organization not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeOrgNotFound, "organization not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to get organization")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get organization")
 		return
 	}
 
 	roles, err := h.store.ListRoles(r.Context(), org.ID)
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "failed to list roles")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to list roles")
 		return
 	}
 	if roles == nil {
@@ -110,26 +110,26 @@ func (h *Handler) handleUpdateRole(w http.ResponseWriter, r *http.Request) {
 	org, err := h.store.GetOrgBySlug(r.Context(), slug)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "organization not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeOrgNotFound, "organization not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to get organization")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get organization")
 		return
 	}
 
 	role, err := h.store.GetRoleByName(r.Context(), org.ID, roleName)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "role not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeInvalidRequest, "role not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to get role")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get role")
 		return
 	}
 
 	var req updateRoleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeProblem(w, http.StatusBadRequest, "invalid request body")
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid request body")
 		return
 	}
 
@@ -138,7 +138,7 @@ func (h *Handler) handleUpdateRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.store.UpdateRole(r.Context(), role); err != nil {
-		writeProblem(w, http.StatusInternalServerError, "failed to update role")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to update role")
 		return
 	}
 
@@ -151,29 +151,29 @@ func (h *Handler) handleDeleteRole(w http.ResponseWriter, r *http.Request) {
 	org, err := h.store.GetOrgBySlug(r.Context(), slug)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "organization not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeOrgNotFound, "organization not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to get organization")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get organization")
 		return
 	}
 
 	role, err := h.store.GetRoleByName(r.Context(), org.ID, roleName)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "role not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeInvalidRequest, "role not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to get role")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get role")
 		return
 	}
 
 	if err := h.store.DeleteRole(r.Context(), role.ID); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "role not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeInvalidRequest, "role not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to delete role")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to delete role")
 		return
 	}
 

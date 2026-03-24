@@ -24,6 +24,8 @@ func (p *Provider) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 		"id_token_signing_alg_values_supported": []string{p.signer.Algorithm()},
 		"token_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post", "none"},
 		"code_challenge_methods_supported":      []string{"S256"},
+		"introspection_endpoint":                issuer + "/introspect",
+		"revocation_endpoint":                   issuer + "/revoke",
 		"acr_values_supported":                  []string{ACRBasic, ACRMFA},
 	}
 

@@ -31,17 +31,17 @@ func (h *Handler) handleImpersonate(w http.ResponseWriter, r *http.Request) {
 	// Verify user exists.
 	if _, err := h.store.GetUser(r.Context(), userID); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "user not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeUserNotFound, "user not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to get user")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get user")
 		return
 	}
 
 	// Generate a secure session ID.
 	sessionID, err := generateSessionID()
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "failed to generate session")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to generate session")
 		return
 	}
 
@@ -75,7 +75,7 @@ func (h *Handler) handleImpersonate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.store.CreateSession(r.Context(), sess); err != nil {
-		writeProblem(w, http.StatusInternalServerError, "failed to create impersonation session")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to create impersonation session")
 		return
 	}
 

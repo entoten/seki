@@ -10,6 +10,7 @@ import (
 
 	"github.com/entoten/seki/internal/config"
 	"github.com/entoten/seki/internal/storage"
+	"github.com/entoten/seki/internal/telemetry"
 
 	_ "modernc.org/sqlite"
 )
@@ -86,6 +87,9 @@ func (s *Store) Ping(ctx context.Context) error {
 // ---------------------------------------------------------------------------
 
 func (s *Store) CreateUser(ctx context.Context, user *storage.User) error {
+	ctx, span := telemetry.Tracer().Start(ctx, "storage.CreateUser")
+	defer span.End()
+
 	meta := normalizeJSON(user.Metadata)
 	now := timeStr(user.CreatedAt)
 	_, err := s.db.ExecContext(ctx,
@@ -103,6 +107,9 @@ func (s *Store) CreateUser(ctx context.Context, user *storage.User) error {
 }
 
 func (s *Store) GetUser(ctx context.Context, id string) (*storage.User, error) {
+	ctx, span := telemetry.Tracer().Start(ctx, "storage.GetUser")
+	defer span.End()
+
 	row := s.db.QueryRowContext(ctx,
 		`SELECT id, email, display_name, disabled, email_verified, metadata, created_at, updated_at
 		 FROM users WHERE id = ?`, id)
@@ -252,6 +259,9 @@ func (s *Store) DeleteClient(ctx context.Context, id string) error {
 // ---------------------------------------------------------------------------
 
 func (s *Store) CreateSession(ctx context.Context, session *storage.Session) error {
+	ctx, span := telemetry.Tracer().Start(ctx, "storage.CreateSession")
+	defer span.End()
+
 	meta := normalizeJSON(session.Metadata)
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO sessions (id, user_id, client_id, ip_address, user_agent, metadata, created_at, expires_at, last_active_at, absolute_expires_at)
@@ -268,6 +278,9 @@ func (s *Store) CreateSession(ctx context.Context, session *storage.Session) err
 }
 
 func (s *Store) GetSession(ctx context.Context, id string) (*storage.Session, error) {
+	ctx, span := telemetry.Tracer().Start(ctx, "storage.GetSession")
+	defer span.End()
+
 	row := s.db.QueryRowContext(ctx,
 		`SELECT id, user_id, client_id, ip_address, user_agent, metadata, created_at, expires_at, last_active_at, absolute_expires_at
 		 FROM sessions WHERE id = ?`, id)

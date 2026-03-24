@@ -22,12 +22,12 @@ func RequireAPIKey(apiKeys []string) func(http.Handler) http.Handler {
 
 			key := extractAPIKey(r)
 			if key == "" {
-				writeProblem(w, http.StatusUnauthorized, "missing API key")
+				writeProblem(w, r, http.StatusUnauthorized, ErrCodeUnauthorized, "missing API key")
 				return
 			}
 
 			if !validKey(key, apiKeys) {
-				writeProblem(w, http.StatusUnauthorized, "invalid API key")
+				writeProblem(w, r, http.StatusUnauthorized, ErrCodeUnauthorized, "invalid API key")
 				return
 			}
 

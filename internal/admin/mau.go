@@ -24,16 +24,16 @@ func (h *Handler) handleGetMAU(w http.ResponseWriter, r *http.Request) {
 		org, err := h.store.GetOrgBySlug(r.Context(), orgSlug)
 		if err != nil {
 			if err == storage.ErrNotFound {
-				writeProblem(w, http.StatusNotFound, "organization not found")
+				writeProblem(w, r, http.StatusNotFound, ErrCodeOrgNotFound, "organization not found")
 				return
 			}
-			writeProblem(w, http.StatusInternalServerError, "failed to get organization")
+			writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get organization")
 			return
 		}
 
 		count, err := tracker.GetMAUByOrg(r.Context(), now, org.ID)
 		if err != nil {
-			writeProblem(w, http.StatusInternalServerError, "failed to get MAU")
+			writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get MAU")
 			return
 		}
 
@@ -47,7 +47,7 @@ func (h *Handler) handleGetMAU(w http.ResponseWriter, r *http.Request) {
 
 	count, err := tracker.GetMAU(r.Context(), now)
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "failed to get MAU")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get MAU")
 		return
 	}
 
@@ -69,7 +69,7 @@ func (h *Handler) handleGetMAUHistory(w http.ResponseWriter, r *http.Request) {
 
 	history, err := tracker.GetMAUHistory(r.Context(), months)
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "failed to get MAU history")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get MAU history")
 		return
 	}
 

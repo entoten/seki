@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/entoten/seki/internal/storage"
+	"github.com/entoten/seki/internal/telemetry"
 	"github.com/entoten/seki/internal/validate"
 )
 
@@ -19,6 +20,10 @@ const authCodeTTL = 10 * time.Minute
 
 // handleAuthorize implements the OAuth 2.0 Authorization Endpoint.
 func (p *Provider) handleAuthorize(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.Tracer().Start(r.Context(), "oidc.authorize")
+	defer span.End()
+	r = r.WithContext(ctx)
+
 	q := r.URL.Query()
 
 	clientID := q.Get("client_id")

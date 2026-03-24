@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -25,6 +26,7 @@ import (
 	"github.com/entoten/seki/internal/scim"
 	"github.com/entoten/seki/internal/session"
 	"github.com/entoten/seki/internal/storage"
+	"github.com/entoten/seki/internal/telemetry"
 	"github.com/entoten/seki/internal/webhook"
 	adminui "github.com/entoten/seki/web/admin"
 )
@@ -67,9 +69,10 @@ func New(cfg *config.Config, store storage.Storage, signer crypto.Signer) *Serve
 	}
 
 	// Build middleware chain (outermost first):
-	// RequestID -> Recovery -> SecurityHeaders -> CORS -> RateLimit -> Metrics -> Router
+	// RequestID -> Recovery -> SecurityHeaders -> CORS -> RateLimit -> Tracing -> Metrics -> Router
 	var handler http.Handler = mux
 	handler = metrics.Middleware(handler)
+	handler = telemetry.HTTPMiddleware()(handler)
 	if limiter != nil {
 		handler = ratelimit.HTTPMiddleware(limiter)(handler)
 	}
@@ -140,6 +143,11 @@ func (s *Server) registerRoutes() {
 	s.mux.Handle("GET /admin", http.RedirectHandler("/admin/", http.StatusMovedPermanently))
 	s.mux.Handle("GET /admin/", http.StripPrefix("/admin/", http.FileServer(http.FS(adminFS))))
 
+	// pprof debug endpoints (behind admin API key auth when enabled).
+	if s.cfg.Debug.PprofEnabled {
+		s.registerPprofRoutes()
+	}
+
 	// Authentication method routes.
 	s.registerAuthnRoutes()
 }
@@ -177,6 +185,21 @@ func (s *Server) registerAuthnRoutes() {
 		socialHandler := social.NewHandler(svc, s.cfg.Server.Issuer)
 		socialHandler.RegisterRoutes(s.mux)
 	}
+}
+
+// registerPprofRoutes registers net/http/pprof handlers behind admin API key auth.
+func (s *Server) registerPprofRoutes() {
+	pprofMux := http.NewServeMux()
+	pprofMux.HandleFunc("/debug/pprof/", pprof.Index)
+	pprofMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	pprofMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	pprofMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	pprofMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+	var handler http.Handler = pprofMux
+	handler = admin.RequireAPIKey(s.cfg.Admin.APIKeys)(handler)
+
+	s.mux.Handle("/debug/pprof/", handler)
 }
 
 // handleHealthzLive responds with 200 if the process is running (liveness probe).

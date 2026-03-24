@@ -15,6 +15,20 @@ type Config struct {
 	RateLimit      RateLimitConfig      `yaml:"rate_limit"`
 	CORS           CORSConfig           `yaml:"cors"`
 	Log            LogConfig            `yaml:"log"`
+	Telemetry      TelemetryConfig      `yaml:"telemetry"`
+	Debug          DebugConfig          `yaml:"debug"`
+}
+
+// TelemetryConfig holds OpenTelemetry tracing settings.
+type TelemetryConfig struct {
+	Enabled      bool   `yaml:"enabled"`
+	OTLPEndpoint string `yaml:"otlp_endpoint"` // e.g. "localhost:4318"
+	ServiceName  string `yaml:"service_name"`  // default "seki"
+}
+
+// DebugConfig holds debugging and profiling settings.
+type DebugConfig struct {
+	PprofEnabled bool `yaml:"pprof_enabled"`
 }
 
 // LogConfig holds structured logging settings.

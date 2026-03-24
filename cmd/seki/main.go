@@ -20,6 +20,7 @@ import (
 	"github.com/entoten/seki/internal/oidc"
 	"github.com/entoten/seki/internal/server"
 	"github.com/entoten/seki/internal/storage"
+	"github.com/entoten/seki/internal/telemetry"
 	_ "github.com/entoten/seki/internal/storage/postgres"
 	_ "github.com/entoten/seki/internal/storage/sqlite"
 )
@@ -51,6 +52,14 @@ func main() {
 
 	// Set up structured logging.
 	logger := logging.Setup(cfg.Log.Level, cfg.Log.Format)
+
+	// Set up OpenTelemetry tracing.
+	telemetryShutdown, err := telemetry.Setup(cfg.Telemetry)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "telemetry setup error: %v\n", err)
+		os.Exit(1)
+	}
+	defer telemetryShutdown(context.Background())
 
 	// Print startup banner.
 	printBanner(cfg)

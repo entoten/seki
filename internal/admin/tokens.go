@@ -39,21 +39,21 @@ func (h *Handler) handleCreatePAT(w http.ResponseWriter, r *http.Request) {
 	_, err := h.store.GetUser(r.Context(), userID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "user not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeUserNotFound, "user not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to get user")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get user")
 		return
 	}
 
 	var req createPATRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeProblem(w, http.StatusBadRequest, "invalid request body")
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid request body")
 		return
 	}
 
 	if req.Name == "" {
-		writeProblem(w, http.StatusBadRequest, "name is required")
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, "name is required")
 		return
 	}
 
@@ -70,7 +70,7 @@ func (h *Handler) handleCreatePAT(w http.ResponseWriter, r *http.Request) {
 	svc := pat.NewService(h.store)
 	token, p, err := svc.Generate(r.Context(), userID, req.Name, req.Scopes, expiresAt)
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "failed to create token")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to create token")
 		return
 	}
 
@@ -84,16 +84,16 @@ func (h *Handler) handleListPATs(w http.ResponseWriter, r *http.Request) {
 	_, err := h.store.GetUser(r.Context(), userID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "user not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeUserNotFound, "user not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to get user")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get user")
 		return
 	}
 
 	pats, err := h.store.ListPATsByUser(r.Context(), userID)
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "failed to list tokens")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to list tokens")
 		return
 	}
 	if pats == nil {
@@ -109,10 +109,10 @@ func (h *Handler) handleDeletePAT(w http.ResponseWriter, r *http.Request) {
 	svc := pat.NewService(h.store)
 	if err := svc.Revoke(r.Context(), tokenID); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "token not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeTokenExpired, "token not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to delete token")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to delete token")
 		return
 	}
 

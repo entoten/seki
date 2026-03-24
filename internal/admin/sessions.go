@@ -25,16 +25,16 @@ func (h *Handler) handleListUserSessions(w http.ResponseWriter, r *http.Request)
 	// Verify user exists.
 	if _, err := h.store.GetUser(r.Context(), userID); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "user not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeUserNotFound, "user not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to get user")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get user")
 		return
 	}
 
 	sessions, err := h.store.ListSessionsByUserID(r.Context(), userID)
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "failed to list sessions")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to list sessions")
 		return
 	}
 	if sessions == nil {
@@ -52,10 +52,10 @@ func (h *Handler) handleRevokeUserSession(w http.ResponseWriter, r *http.Request
 	// Verify user exists.
 	if _, err := h.store.GetUser(r.Context(), userID); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "user not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeUserNotFound, "user not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to get user")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get user")
 		return
 	}
 
@@ -63,23 +63,23 @@ func (h *Handler) handleRevokeUserSession(w http.ResponseWriter, r *http.Request
 	sess, err := h.store.GetSession(r.Context(), sessionID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "session not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeInvalidRequest, "session not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to get session")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get session")
 		return
 	}
 	if sess.UserID != userID {
-		writeProblem(w, http.StatusNotFound, "session not found")
+		writeProblem(w, r, http.StatusNotFound, ErrCodeInvalidRequest, "session not found")
 		return
 	}
 
 	if err := h.store.DeleteSession(r.Context(), sessionID); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "session not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeInvalidRequest, "session not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to revoke session")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to revoke session")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

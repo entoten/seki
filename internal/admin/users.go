@@ -37,20 +37,20 @@ type userListResponse struct {
 func (h *Handler) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	var req createUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeProblem(w, http.StatusBadRequest, "invalid request body")
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid request body")
 		return
 	}
 
 	if err := validate.Email(req.Email); err != nil {
-		writeProblem(w, http.StatusBadRequest, err.Error())
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, err.Error())
 		return
 	}
 	if err := validate.DisplayName(req.DisplayName); err != nil {
-		writeProblem(w, http.StatusBadRequest, err.Error())
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, err.Error())
 		return
 	}
 	if err := validate.Metadata(req.Metadata); err != nil {
-		writeProblem(w, http.StatusBadRequest, err.Error())
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, err.Error())
 		return
 	}
 
@@ -69,10 +69,10 @@ func (h *Handler) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.store.CreateUser(r.Context(), user); err != nil {
 		if errors.Is(err, storage.ErrAlreadyExists) {
-			writeProblem(w, http.StatusConflict, "email already exists")
+			writeProblem(w, r, http.StatusConflict, ErrCodeConflict, "email already exists")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to create user")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to create user")
 		return
 	}
 
@@ -86,10 +86,10 @@ func (h *Handler) handleGetUser(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.GetUser(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "user not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeUserNotFound, "user not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to get user")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get user")
 		return
 	}
 
@@ -108,7 +108,7 @@ func (h *Handler) handleListUsers(w http.ResponseWriter, r *http.Request) {
 				writeJSON(w, http.StatusOK, userListResponse{Users: []*storage.User{}})
 				return
 			}
-			writeProblem(w, http.StatusInternalServerError, "failed to search users")
+			writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to search users")
 			return
 		}
 		writeJSON(w, http.StatusOK, userListResponse{Users: []*storage.User{user}})
@@ -132,7 +132,7 @@ func (h *Handler) handleListUsers(w http.ResponseWriter, r *http.Request) {
 
 	users, nextCursor, err := h.store.ListUsers(r.Context(), opts)
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "failed to list users")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to list users")
 		return
 	}
 	if users == nil {
@@ -151,29 +151,29 @@ func (h *Handler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	existing, err := h.store.GetUser(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "user not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeUserNotFound, "user not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to get user")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get user")
 		return
 	}
 
 	var req updateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeProblem(w, http.StatusBadRequest, "invalid request body")
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid request body")
 		return
 	}
 
 	if req.Email != nil {
 		if err := validate.Email(*req.Email); err != nil {
-			writeProblem(w, http.StatusBadRequest, err.Error())
+			writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, err.Error())
 			return
 		}
 		existing.Email = *req.Email
 	}
 	if req.DisplayName != nil {
 		if err := validate.DisplayName(*req.DisplayName); err != nil {
-			writeProblem(w, http.StatusBadRequest, err.Error())
+			writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, err.Error())
 			return
 		}
 		existing.DisplayName = *req.DisplayName
@@ -183,7 +183,7 @@ func (h *Handler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Metadata != nil {
 		if err := validate.Metadata(*req.Metadata); err != nil {
-			writeProblem(w, http.StatusBadRequest, err.Error())
+			writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, err.Error())
 			return
 		}
 		existing.Metadata = *req.Metadata
@@ -191,17 +191,17 @@ func (h *Handler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.store.UpdateUser(r.Context(), existing); err != nil {
 		if errors.Is(err, storage.ErrAlreadyExists) {
-			writeProblem(w, http.StatusConflict, "email already exists")
+			writeProblem(w, r, http.StatusConflict, ErrCodeConflict, "email already exists")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to update user")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to update user")
 		return
 	}
 
 	// Re-fetch to get the updated_at value set by the store.
 	updated, err := h.store.GetUser(r.Context(), id)
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "failed to get updated user")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get updated user")
 		return
 	}
 
@@ -213,10 +213,10 @@ func (h *Handler) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := h.store.DeleteUser(r.Context(), id); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "user not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeUserNotFound, "user not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to delete user")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to delete user")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

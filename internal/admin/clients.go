@@ -34,19 +34,19 @@ type createClientRequest struct {
 func (h *Handler) handleCreateClient(w http.ResponseWriter, r *http.Request) {
 	var req createClientRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeProblem(w, http.StatusBadRequest, "invalid request body")
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid request body")
 		return
 	}
 	if err := validate.ClientID(req.ID); err != nil {
-		writeProblem(w, http.StatusBadRequest, err.Error())
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, err.Error())
 		return
 	}
 	if err := validate.Name(req.Name); err != nil {
-		writeProblem(w, http.StatusBadRequest, err.Error())
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRequest, err.Error())
 		return
 	}
 	if err := validate.RedirectURIs(req.RedirectURIs); err != nil {
-		writeProblem(w, http.StatusBadRequest, err.Error())
+		writeProblem(w, r, http.StatusBadRequest, ErrCodeInvalidRedirectURI, err.Error())
 		return
 	}
 
@@ -77,10 +77,10 @@ func (h *Handler) handleCreateClient(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.store.CreateClient(r.Context(), client); err != nil {
 		if errors.Is(err, storage.ErrAlreadyExists) {
-			writeProblem(w, http.StatusConflict, "client already exists")
+			writeProblem(w, r, http.StatusConflict, ErrCodeConflict, "client already exists")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to create client")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to create client")
 		return
 	}
 
@@ -92,10 +92,10 @@ func (h *Handler) handleGetClient(w http.ResponseWriter, r *http.Request) {
 	client, err := h.store.GetClient(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "client not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeInvalidClient, "client not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to get client")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to get client")
 		return
 	}
 	writeJSON(w, http.StatusOK, client)
@@ -108,7 +108,7 @@ type clientListResponse struct {
 func (h *Handler) handleListClients(w http.ResponseWriter, r *http.Request) {
 	clients, err := h.store.ListClients(r.Context())
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "failed to list clients")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to list clients")
 		return
 	}
 	if clients == nil {
@@ -121,10 +121,10 @@ func (h *Handler) handleDeleteClient(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := h.store.DeleteClient(r.Context(), id); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeProblem(w, http.StatusNotFound, "client not found")
+			writeProblem(w, r, http.StatusNotFound, ErrCodeInvalidClient, "client not found")
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "failed to delete client")
+		writeProblem(w, r, http.StatusInternalServerError, ErrCodeInternalError, "failed to delete client")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

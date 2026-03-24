@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/entoten/seki/internal/storage"
+	"github.com/entoten/seki/internal/telemetry"
 )
 
 const (
@@ -21,6 +22,10 @@ const (
 
 // handleToken implements the OAuth 2.0 Token Endpoint (POST /token).
 func (p *Provider) handleToken(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.Tracer().Start(r.Context(), "oidc.token")
+	defer span.End()
+	r = r.WithContext(ctx)
+
 	if r.Method != http.MethodPost {
 		tokenError(w, http.StatusMethodNotAllowed, "invalid_request", "method must be POST")
 		return
