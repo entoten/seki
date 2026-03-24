@@ -3,6 +3,7 @@ package admin
 import (
 	"net/http"
 
+	"github.com/Monet/seki/internal/audit"
 	"github.com/Monet/seki/internal/storage"
 	"github.com/Monet/seki/internal/validate"
 )
@@ -11,6 +12,12 @@ import (
 type Handler struct {
 	store   storage.Storage
 	apiKeys []string
+	audit   *audit.Logger
+}
+
+// SetAuditLogger configures an optional audit logger for the admin handler.
+func (h *Handler) SetAuditLogger(l *audit.Logger) {
+	h.audit = l
 }
 
 // NewHandler creates a new admin API handler backed by the given storage.
@@ -38,6 +45,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	h.registerClientRoutesOn(api)
 	h.registerPATRoutesOn(api)
 	h.registerBrandingRoutesOn(api)
+	h.registerImpersonateRoutesOn(api)
 	h.registerMAURoutesOn(api)
 
 	// Wrap with authentication + body size limit and mount on the outer mux.

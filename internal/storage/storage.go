@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -56,6 +57,7 @@ type SessionStore interface {
 	DeleteSession(ctx context.Context, id string) error
 	DeleteExpiredSessions(ctx context.Context) (int64, error)
 	UpdateSessionActivity(ctx context.Context, id string, lastActive time.Time) error
+	UpdateSessionMetadata(ctx context.Context, id string, metadata json.RawMessage) error
 	DeleteSessionsByUserID(ctx context.Context, userID string) (int64, error)
 	ListSessionsByUserID(ctx context.Context, userID string) ([]*Session, error)
 	CountSessionsByUserID(ctx context.Context, userID string) (int64, error)

@@ -70,6 +70,10 @@ func (p *Provider) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /login", p.handleLoginSubmit)
 	mux.HandleFunc("POST /logout", p.handleLogout)
 
+	// MFA step-up routes.
+	mux.HandleFunc("GET /mfa", p.handleMFAPage)
+	mux.HandleFunc("POST /mfa", p.handleMFASubmit)
+
 	// Device authorization grant (RFC 8628).
 	p.RegisterDeviceRoutes(mux)
 }

@@ -117,11 +117,27 @@ func (p *Provider) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// --- Check acr_values for step-up MFA ---
+	acrValues := q.Get("acr_values")
+	mfaRequired := containsACR(acrValues, ACRMFA)
+	mfaVerified := sessionHasMFA(sess)
+
+	if mfaRequired && !mfaVerified {
+		p.redirectToMFA(w, r)
+		return
+	}
+
 	// --- Generate authorization code ---
 	code, err := generateAuthCode()
 	if err != nil {
 		redirectWithError(w, r, parsed, state, "server_error", "failed to generate authorization code")
 		return
+	}
+
+	// Determine achieved ACR level.
+	acr := ACRBasic
+	if mfaVerified {
+		acr = ACRMFA
 	}
 
 	now := time.Now().UTC()
@@ -135,6 +151,7 @@ func (p *Provider) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		CodeChallengeMethod: codeChallengeMethod,
 		Nonce:               nonce,
 		State:               state,
+		ACR:                 acr,
 		ExpiresAt:           now.Add(authCodeTTL),
 		CreatedAt:           now,
 	}

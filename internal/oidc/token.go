@@ -127,7 +127,7 @@ func (p *Provider) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.R
 	}
 
 	// Generate ID token.
-	idToken, err := p.generateIDToken(user, client, authCode.Nonce, now)
+	idToken, err := p.generateIDToken(user, client, authCode.Nonce, authCode.ACR, now)
 	if err != nil {
 		tokenError(w, http.StatusInternalServerError, "server_error", "failed to generate id token")
 		return
@@ -295,7 +295,7 @@ func (p *Provider) handleRefreshTokenGrant(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Generate new ID token.
-	idToken, err := p.generateIDToken(user, client, "", now)
+	idToken, err := p.generateIDToken(user, client, "", "", now)
 	if err != nil {
 		tokenError(w, http.StatusInternalServerError, "server_error", "failed to generate id token")
 		return

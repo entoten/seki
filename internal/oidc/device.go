@@ -266,7 +266,7 @@ func (p *Provider) handleDeviceCodeGrant(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	idToken, err := p.generateIDToken(user, client, "", now)
+	idToken, err := p.generateIDToken(user, client, "", "", now)
 	if err != nil {
 		tokenError(w, http.StatusInternalServerError, "server_error", "failed to generate id token")
 		return

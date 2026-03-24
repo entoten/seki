@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -147,6 +148,11 @@ func (m *Manager) Get(ctx context.Context, sessionID string) (*storage.Session, 
 	sess.ExpiresAt = newExpiry
 	_ = m.store.UpdateSessionActivity(ctx, sessionID, now)
 	return sess, nil
+}
+
+// UpdateMetadata replaces the metadata JSON on an existing session.
+func (m *Manager) UpdateMetadata(ctx context.Context, sessionID string, metadata json.RawMessage) error {
+	return m.store.UpdateSessionMetadata(ctx, sessionID, metadata)
 }
 
 // Delete invalidates a session (logout).

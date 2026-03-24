@@ -28,13 +28,19 @@ func (p *Provider) generateAccessToken(sub, clientID string, scopes []string, no
 }
 
 // generateIDToken creates a signed JWT ID token with OIDC standard claims.
-func (p *Provider) generateIDToken(user *storage.User, client *storage.Client, nonce string, now time.Time) (string, error) {
+// The acr parameter sets the Authentication Context Class Reference claim.
+// If empty, it defaults to ACRBasic.
+func (p *Provider) generateIDToken(user *storage.User, client *storage.Client, nonce string, acr string, now time.Time) (string, error) {
+	if acr == "" {
+		acr = ACRBasic
+	}
 	claims := map[string]interface{}{
 		"sub": user.ID,
 		"iss": p.issuer,
 		"aud": client.ID,
 		"exp": now.Add(accessTokenTTL).Unix(),
 		"iat": now.Unix(),
+		"acr": acr,
 	}
 
 	if user.Email != "" {

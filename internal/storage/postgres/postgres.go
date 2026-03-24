@@ -340,6 +340,21 @@ func (s *Store) UpdateSessionActivity(ctx context.Context, id string, lastActive
 	return nil
 }
 
+func (s *Store) UpdateSessionMetadata(ctx context.Context, id string, metadata json.RawMessage) error {
+	meta := normalizeJSON(metadata)
+	ct, err := s.pool.Exec(ctx,
+		`UPDATE sessions SET metadata = $1 WHERE id = $2`,
+		meta, id,
+	)
+	if err != nil {
+		return fmt.Errorf("postgres: update session metadata: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) DeleteSessionsByUserID(ctx context.Context, userID string) (int64, error) {
 	ct, err := s.pool.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1`, userID)
 	if err != nil {
@@ -492,11 +507,11 @@ func (s *Store) CountDistinctActorsByOrg(ctx context.Context, action string, fro
 func (s *Store) CreateAuthCode(ctx context.Context, code *storage.AuthCode) error {
 	scopes, _ := json.Marshal(code.Scopes)
 	_, err := s.pool.Exec(ctx,
-		`INSERT INTO authorization_codes (code, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, nonce, state, expires_at, created_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		`INSERT INTO authorization_codes (code, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, nonce, state, acr, expires_at, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
 		code.Code, code.ClientID, code.UserID, code.RedirectURI,
 		string(scopes), code.CodeChallenge, code.CodeChallengeMethod,
-		code.Nonce, code.State,
+		code.Nonce, code.State, code.ACR,
 		code.ExpiresAt.UTC(), code.CreatedAt.UTC(),
 	)
 	if err != nil {
@@ -510,11 +525,11 @@ func (s *Store) CreateAuthCode(ctx context.Context, code *storage.AuthCode) erro
 
 func (s *Store) GetAuthCode(ctx context.Context, code string) (*storage.AuthCode, error) {
 	row := s.pool.QueryRow(ctx,
-		`SELECT code, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, nonce, state, expires_at, created_at
+		`SELECT code, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, nonce, state, acr, expires_at, created_at
 		 FROM authorization_codes WHERE code = $1`, code)
 	var ac storage.AuthCode
 	var scopes []byte
-	err := row.Scan(&ac.Code, &ac.ClientID, &ac.UserID, &ac.RedirectURI, &scopes, &ac.CodeChallenge, &ac.CodeChallengeMethod, &ac.Nonce, &ac.State, &ac.ExpiresAt, &ac.CreatedAt)
+	err := row.Scan(&ac.Code, &ac.ClientID, &ac.UserID, &ac.RedirectURI, &scopes, &ac.CodeChallenge, &ac.CodeChallengeMethod, &ac.Nonce, &ac.State, &ac.ACR, &ac.ExpiresAt, &ac.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, storage.ErrNotFound

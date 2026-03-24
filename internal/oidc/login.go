@@ -36,6 +36,7 @@ var oidcParamKeys = []string{
 	"nonce",
 	"code_challenge",
 	"code_challenge_method",
+	"acr_values",
 }
 
 var loginTemplate = template.Must(

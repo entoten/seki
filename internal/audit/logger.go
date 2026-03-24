@@ -26,6 +26,7 @@ const (
 	EventTokenIssued       = "token.issued"
 	EventTokenRefreshed    = "token.refreshed"
 	EventPasskeyRegistered = "passkey.registered"
+	EventUserImpersonated  = "user.impersonated"
 )
 
 // Event represents a single auditable action.
