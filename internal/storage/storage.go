@@ -55,6 +55,8 @@ type SessionStore interface {
 	DeleteExpiredSessions(ctx context.Context) (int64, error)
 	UpdateSessionActivity(ctx context.Context, id string, lastActive time.Time) error
 	DeleteSessionsByUserID(ctx context.Context, userID string) (int64, error)
+	ListSessionsByUserID(ctx context.Context, userID string) ([]*Session, error)
+	CountSessionsByUserID(ctx context.Context, userID string) (int64, error)
 }
 
 // AuditStore defines operations on audit log entries.

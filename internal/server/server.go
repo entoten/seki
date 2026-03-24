@@ -46,7 +46,9 @@ func New(cfg *config.Config, store storage.Storage, signer crypto.Signer) *Serve
 	mux := http.NewServeMux()
 
 	// Session manager.
-	sessMgr := session.NewManager(store, session.Config{})
+	sessMgr := session.NewManager(store, session.Config{
+		MaxConcurrentSessions: cfg.Session.MaxConcurrentSessions,
+	})
 
 	// Audit logger.
 	auditLogger := audit.NewLogger(store, cfg.Audit)
@@ -93,8 +95,10 @@ func New(cfg *config.Config, store storage.Storage, signer crypto.Signer) *Serve
 
 // registerRoutes sets up all HTTP routes.
 func (s *Server) registerRoutes() {
-	// Health check.
-	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
+	// Health check endpoints.
+	s.mux.HandleFunc("GET /healthz", s.handleHealthzReady)
+	s.mux.HandleFunc("GET /healthz/ready", s.handleHealthzReady)
+	s.mux.HandleFunc("GET /healthz/live", s.handleHealthzLive)
 
 	// Prometheus metrics.
 	s.mux.Handle("GET /metrics", promhttp.Handler())
@@ -165,9 +169,15 @@ func (s *Server) registerAuthnRoutes() {
 	}
 }
 
-// handleHealthz responds with a simple health check.
-func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
-	// Optionally check storage connectivity.
+// handleHealthzLive responds with 200 if the process is running (liveness probe).
+func (s *Server) handleHealthzLive(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "alive"})
+}
+
+// handleHealthzReady checks DB connectivity (readiness probe).
+func (s *Server) handleHealthzReady(w http.ResponseWriter, r *http.Request) {
 	status := "ok"
 	httpStatus := http.StatusOK
 	if s.store != nil {
@@ -180,6 +190,12 @@ func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpStatus)
 	json.NewEncoder(w).Encode(map[string]string{"status": status})
+}
+
+// ServeHTTP implements http.Handler, delegating to the inner server handler.
+// This is useful for testing without starting a network listener.
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.server.Handler.ServeHTTP(w, r)
 }
 
 // ListenAndServe starts the HTTP server.

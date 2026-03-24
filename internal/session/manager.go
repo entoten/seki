@@ -15,15 +15,19 @@ import (
 // ErrExpired indicates that a session has expired (idle or absolute timeout).
 var ErrExpired = errors.New("session: expired")
 
+// ErrTooManySessions indicates that the user has reached the maximum number of concurrent sessions.
+var ErrTooManySessions = errors.New("session: too many concurrent sessions")
+
 // Config controls session behaviour.
 type Config struct {
-	IdleTimeout     time.Duration // default 30m — extended on each access
-	AbsoluteTimeout time.Duration // default 24h — never extended
-	CookieName      string
-	CookieDomain    string
-	CookieSecure    bool
-	CookieSameSite  http.SameSite
-	CookiePath      string
+	IdleTimeout           time.Duration // default 30m — extended on each access
+	AbsoluteTimeout       time.Duration // default 24h — never extended
+	MaxConcurrentSessions int           // 0 = unlimited; if > 0 oldest sessions are evicted to make room
+	CookieName            string
+	CookieDomain          string
+	CookieSecure          bool
+	CookieSameSite        http.SameSite
+	CookiePath            string
 }
 
 func (c *Config) defaults() {
@@ -57,7 +61,16 @@ func NewManager(store storage.SessionStore, cfg Config) *Manager {
 }
 
 // Create builds a new session. Both idle and absolute timeouts are set.
+// If MaxConcurrentSessions > 0, the oldest sessions for the user are evicted
+// to make room before creating the new one.
 func (m *Manager) Create(ctx context.Context, userID, clientID, ip, userAgent string) (*storage.Session, error) {
+	// Enforce concurrent session limit by evicting oldest sessions.
+	if max := m.config.MaxConcurrentSessions; max > 0 {
+		if err := m.evictOldestSessions(ctx, userID, max); err != nil {
+			return nil, fmt.Errorf("session: enforce limit: %w", err)
+		}
+	}
+
 	id, err := generateID()
 	if err != nil {
 		return nil, err
@@ -78,6 +91,32 @@ func (m *Manager) Create(ctx context.Context, userID, clientID, ip, userAgent st
 		return nil, fmt.Errorf("session: create: %w", err)
 	}
 	return sess, nil
+}
+
+// evictOldestSessions deletes the oldest sessions for a user so that at most
+// (max - 1) sessions remain, leaving room for one new session.
+func (m *Manager) evictOldestSessions(ctx context.Context, userID string, max int) error {
+	sessions, err := m.store.ListSessionsByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	// Need to leave room for the new session we're about to create.
+	excess := len(sessions) - (max - 1)
+	if excess <= 0 {
+		return nil
+	}
+	// Sessions are returned ordered by created_at ASC (oldest first).
+	for i := 0; i < excess; i++ {
+		if err := m.store.DeleteSession(ctx, sessions[i].ID); err != nil {
+			return fmt.Errorf("evict session %s: %w", sessions[i].ID, err)
+		}
+	}
+	return nil
+}
+
+// ListByUserID returns all active sessions for the given user.
+func (m *Manager) ListByUserID(ctx context.Context, userID string) ([]*storage.Session, error) {
+	return m.store.ListSessionsByUserID(ctx, userID)
 }
 
 // Get retrieves and validates a session. It checks both idle and absolute

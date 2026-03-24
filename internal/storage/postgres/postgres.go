@@ -325,6 +325,38 @@ func (s *Store) DeleteSessionsByUserID(ctx context.Context, userID string) (int6
 	return ct.RowsAffected(), nil
 }
 
+func (s *Store) ListSessionsByUserID(ctx context.Context, userID string) ([]*storage.Session, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT id, user_id, client_id, ip_address, user_agent, metadata, created_at, expires_at, last_active_at, absolute_expires_at
+		 FROM sessions WHERE user_id = $1 ORDER BY created_at ASC`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: list sessions by user: %w", err)
+	}
+	defer rows.Close()
+
+	var sessions []*storage.Session
+	for rows.Next() {
+		var sess storage.Session
+		var meta []byte
+		err := rows.Scan(&sess.ID, &sess.UserID, &sess.ClientID, &sess.IPAddress, &sess.UserAgent, &meta, &sess.CreatedAt, &sess.ExpiresAt, &sess.LastActiveAt, &sess.AbsoluteExpiresAt)
+		if err != nil {
+			return nil, fmt.Errorf("postgres: scan session row: %w", err)
+		}
+		sess.Metadata = json.RawMessage(meta)
+		sessions = append(sessions, &sess)
+	}
+	return sessions, rows.Err()
+}
+
+func (s *Store) CountSessionsByUserID(ctx context.Context, userID string) (int64, error) {
+	var count int64
+	err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM sessions WHERE user_id = $1`, userID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("postgres: count sessions by user: %w", err)
+	}
+	return count, nil
+}
+
 // ---------------------------------------------------------------------------
 // AuditStore
 // ---------------------------------------------------------------------------

@@ -290,6 +290,35 @@ func (s *Store) DeleteSessionsByUserID(ctx context.Context, userID string) (int6
 	return res.RowsAffected()
 }
 
+func (s *Store) ListSessionsByUserID(ctx context.Context, userID string) ([]*storage.Session, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, user_id, client_id, ip_address, user_agent, metadata, created_at, expires_at, last_active_at, absolute_expires_at
+		 FROM sessions WHERE user_id = ? ORDER BY created_at ASC`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("sqlite: list sessions by user: %w", err)
+	}
+	defer rows.Close()
+
+	var sessions []*storage.Session
+	for rows.Next() {
+		sess, err := scanSession(rows)
+		if err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, sess)
+	}
+	return sessions, rows.Err()
+}
+
+func (s *Store) CountSessionsByUserID(ctx context.Context, userID string) (int64, error) {
+	var count int64
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sessions WHERE user_id = ?`, userID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("sqlite: count sessions by user: %w", err)
+	}
+	return count, nil
+}
+
 // ---------------------------------------------------------------------------
 // AuditStore
 // ---------------------------------------------------------------------------

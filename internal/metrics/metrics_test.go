@@ -21,6 +21,7 @@ func setup(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	prometheus.DefaultRegisterer = reg
 	prometheus.DefaultGatherer = reg
+	metrics.ResetRegistration()
 	metrics.Register()
 }
 

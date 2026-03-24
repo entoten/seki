@@ -8,6 +8,7 @@ type Config struct {
 	Clients        []ClientConfig        `yaml:"clients"`
 	Organizations  []OrganizationConfig  `yaml:"organizations"`
 	Authentication AuthenticationConfig  `yaml:"authentication"`
+	Session        SessionConfig         `yaml:"session"`
 	Audit          AuditConfig           `yaml:"audit"`
 	Webhooks       WebhooksConfig        `yaml:"webhooks"`
 	Admin          AdminConfig           `yaml:"admin"`
@@ -39,8 +40,14 @@ type AdminConfig struct {
 
 // ServerConfig holds HTTP server settings.
 type ServerConfig struct {
-	Address string `yaml:"address"`
-	Issuer  string `yaml:"issuer"`
+	Address        string   `yaml:"address"`
+	Issuer         string   `yaml:"issuer"`
+	TrustedProxies []string `yaml:"trusted_proxies"` // CIDRs of trusted reverse proxies
+}
+
+// SessionConfig holds session management settings.
+type SessionConfig struct {
+	MaxConcurrentSessions int `yaml:"max_concurrent_sessions"` // 0 = unlimited
 }
 
 // DatabaseConfig holds database connection settings.

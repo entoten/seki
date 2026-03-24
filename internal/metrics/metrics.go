@@ -1,6 +1,10 @@
 package metrics
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"sync"
+
+	"github.com/prometheus/client_golang/prometheus"
+)
 
 var (
 	// HTTPRequestsTotal counts all HTTP requests by method, path, and status.
@@ -49,8 +53,17 @@ var (
 	)
 )
 
+var registered bool
+var mu sync.Mutex
+
 // Register registers all metrics with the default Prometheus registerer.
+// It is safe to call multiple times; duplicate registration errors are ignored.
 func Register() {
+	mu.Lock()
+	defer mu.Unlock()
+	if registered {
+		return
+	}
 	prometheus.MustRegister(
 		HTTPRequestsTotal,
 		HTTPRequestDuration,
@@ -58,4 +71,13 @@ func Register() {
 		TokenIssuedTotal,
 		ActiveSessions,
 	)
+	registered = true
+}
+
+// ResetRegistration clears the registration flag so Register can be called
+// again after replacing the default Prometheus registerer. Intended for tests only.
+func ResetRegistration() {
+	mu.Lock()
+	defer mu.Unlock()
+	registered = false
 }
