@@ -10,8 +10,8 @@ import (
 	"github.com/Monet/seki/internal/storage"
 )
 
-// registerOrgRoutes registers org-related admin API routes on the given mux.
-func (h *Handler) registerOrgRoutes(mux *http.ServeMux) {
+// registerOrgRoutesOn registers org-related admin API routes on the given mux.
+func (h *Handler) registerOrgRoutesOn(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/orgs", h.handleCreateOrg)
 	mux.HandleFunc("GET /api/v1/orgs", h.handleListOrgs)
 	mux.HandleFunc("GET /api/v1/orgs/{slug}", h.handleGetOrg)

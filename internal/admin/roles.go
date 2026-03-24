@@ -10,8 +10,8 @@ import (
 	"github.com/Monet/seki/internal/storage"
 )
 
-// registerRoleRoutes registers role-related admin API routes on the given mux.
-func (h *Handler) registerRoleRoutes(mux *http.ServeMux) {
+// registerRoleRoutesOn registers role-related admin API routes on the given mux.
+func (h *Handler) registerRoleRoutesOn(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/orgs/{slug}/roles", h.handleCreateRole)
 	mux.HandleFunc("GET /api/v1/orgs/{slug}/roles", h.handleListRoles)
 	mux.HandleFunc("PATCH /api/v1/orgs/{slug}/roles/{name}", h.handleUpdateRole)
