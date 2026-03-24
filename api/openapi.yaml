@@ -1,0 +1,1525 @@
+openapi: 3.0.3
+info:
+  title: seki API
+  description: |
+    Authentication server API for seki — a modern B2B SaaS authentication core.
+    OIDC first, Passkey first, API first.
+  version: 0.1.0
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: OIDC
+    description: OpenID Connect provider endpoints
+  - name: Authentication
+    description: User authentication flows (passkey, TOTP, password, social)
+  - name: Users
+    description: User management (Admin API)
+  - name: Organizations
+    description: Organization and tenant management (Admin API)
+  - name: Roles
+    description: Role management within organizations (Admin API)
+  - name: Audit
+    description: Audit log access (Admin API)
+  - name: Operations
+    description: Health checks and operational endpoints
+
+paths:
+  # ---------------------------------------------------------------------------
+  # Operations
+  # ---------------------------------------------------------------------------
+  /healthz:
+    get:
+      tags: [Operations]
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok, degraded]
+        "503":
+          description: Unhealthy (database unreachable)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [degraded]
+
+  # ---------------------------------------------------------------------------
+  # OIDC
+  # ---------------------------------------------------------------------------
+  /.well-known/openid-configuration:
+    get:
+      tags: [OIDC]
+      summary: OIDC Discovery document
+      operationId: getDiscovery
+      responses:
+        "200":
+          description: OpenID Provider configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  issuer:
+                    type: string
+                  authorization_endpoint:
+                    type: string
+                  token_endpoint:
+                    type: string
+                  userinfo_endpoint:
+                    type: string
+                  jwks_uri:
+                    type: string
+                  response_types_supported:
+                    type: array
+                    items:
+                      type: string
+                  subject_types_supported:
+                    type: array
+                    items:
+                      type: string
+                  id_token_signing_alg_values_supported:
+                    type: array
+                    items:
+                      type: string
+
+  /.well-known/jwks.json:
+    get:
+      tags: [OIDC]
+      summary: JSON Web Key Set
+      operationId: getJWKS
+      responses:
+        "200":
+          description: JWKS containing the signing public key(s)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      type: object
+
+  /authorize:
+    get:
+      tags: [OIDC]
+      summary: Authorization endpoint
+      description: |
+        Starts the OIDC Authorization Code flow. Redirects to the login page
+        if the user is not authenticated. Supports PKCE (required for public clients).
+      operationId: authorize
+      parameters:
+        - name: response_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [code]
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: redirect_uri
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uri
+        - name: scope
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Space-separated scopes (e.g. "openid profile email")
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: code_challenge
+          in: query
+          schema:
+            type: string
+          description: PKCE code challenge
+        - name: code_challenge_method
+          in: query
+          schema:
+            type: string
+            enum: [S256]
+          description: PKCE code challenge method
+      responses:
+        "302":
+          description: Redirect to login page or back to client with authorization code
+        "400":
+          description: Invalid request parameters
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+
+  /token:
+    post:
+      tags: [OIDC]
+      summary: Token endpoint
+      description: |
+        Exchange an authorization code for tokens, refresh an access token,
+        or obtain tokens via client credentials grant.
+      operationId: token
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                grant_type:
+                  type: string
+                  enum: [authorization_code, refresh_token, client_credentials]
+                code:
+                  type: string
+                  description: Authorization code (for authorization_code grant)
+                redirect_uri:
+                  type: string
+                  format: uri
+                  description: Must match the original redirect_uri
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+                  description: Required for confidential clients
+                code_verifier:
+                  type: string
+                  description: PKCE code verifier
+                refresh_token:
+                  type: string
+                  description: Refresh token (for refresh_token grant)
+              required:
+                - grant_type
+      responses:
+        "200":
+          description: Token response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  token_type:
+                    type: string
+                    enum: [Bearer]
+                  expires_in:
+                    type: integer
+                  refresh_token:
+                    type: string
+                  id_token:
+                    type: string
+                  scope:
+                    type: string
+        "400":
+          description: Invalid grant or request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  error_description:
+                    type: string
+
+  /userinfo:
+    get:
+      tags: [OIDC]
+      summary: UserInfo endpoint
+      description: Returns claims about the authenticated user.
+      operationId: getUserInfo
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User claims
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sub:
+                    type: string
+                  email:
+                    type: string
+                  email_verified:
+                    type: boolean
+                  name:
+                    type: string
+                  preferred_username:
+                    type: string
+        "401":
+          description: Missing or invalid access token
+
+  # ---------------------------------------------------------------------------
+  # Authentication — Passkey
+  # ---------------------------------------------------------------------------
+  /authn/passkey/register/begin:
+    post:
+      tags: [Authentication]
+      summary: Begin passkey registration
+      description: Returns WebAuthn credential creation options.
+      operationId: passkeyRegisterBegin
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Credential creation options
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          description: Not authenticated
+
+  /authn/passkey/register/finish:
+    post:
+      tags: [Authentication]
+      summary: Complete passkey registration
+      description: Verifies and stores the new passkey credential.
+      operationId: passkeyRegisterFinish
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: WebAuthn authenticator attestation response
+      responses:
+        "200":
+          description: Registration successful
+        "400":
+          description: Invalid attestation
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+
+  /authn/passkey/login/begin:
+    post:
+      tags: [Authentication]
+      summary: Begin passkey login
+      operationId: passkeyLoginBegin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+              required:
+                - user_id
+      responses:
+        "200":
+          description: Credential request options
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /authn/passkey/login/finish:
+    post:
+      tags: [Authentication]
+      summary: Complete passkey login
+      operationId: passkeyLoginFinish
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: WebAuthn authenticator assertion response
+      responses:
+        "200":
+          description: Login successful
+        "401":
+          description: Authentication failed
+
+  /authn/passkey/login/discoverable/begin:
+    post:
+      tags: [Authentication]
+      summary: Begin discoverable credential login
+      description: Starts a passkey login without requiring a user identifier.
+      operationId: passkeyDiscoverableLoginBegin
+      responses:
+        "200":
+          description: Credential request options for discoverable login
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /authn/passkey/login/discoverable/finish:
+    post:
+      tags: [Authentication]
+      summary: Complete discoverable credential login
+      operationId: passkeyDiscoverableLoginFinish
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Login successful
+        "401":
+          description: Authentication failed
+
+  /authn/passkey/credentials:
+    get:
+      tags: [Authentication]
+      summary: List passkey credentials
+      operationId: listPasskeyCredentials
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of credentials
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PasskeyCredential"
+
+  /authn/passkey/credentials/inactive:
+    get:
+      tags: [Authentication]
+      summary: List inactive passkey credentials
+      description: Returns credentials that have not been used recently.
+      operationId: listInactivePasskeyCredentials
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of inactive credentials
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PasskeyCredential"
+
+  /authn/passkey/credentials/{id}:
+    patch:
+      tags: [Authentication]
+      summary: Rename a passkey credential
+      operationId: renamePasskeyCredential
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+              required:
+                - name
+      responses:
+        "200":
+          description: Credential renamed
+        "404":
+          description: Credential not found
+    delete:
+      tags: [Authentication]
+      summary: Delete a passkey credential
+      operationId: deletePasskeyCredential
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Credential deleted
+        "404":
+          description: Credential not found
+
+  # ---------------------------------------------------------------------------
+  # Authentication — TOTP
+  # ---------------------------------------------------------------------------
+  /authn/totp/setup/begin:
+    post:
+      tags: [Authentication]
+      summary: Begin TOTP setup
+      description: Returns the TOTP secret and provisioning URI for QR code display.
+      operationId: totpSetupBegin
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: TOTP provisioning data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secret:
+                    type: string
+                  uri:
+                    type: string
+                    description: otpauth:// URI for QR code generation
+
+  /authn/totp/setup/finish:
+    post:
+      tags: [Authentication]
+      summary: Verify TOTP setup
+      description: Validates the first TOTP code to confirm setup and returns recovery codes.
+      operationId: totpSetupFinish
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+              required:
+                - code
+      responses:
+        "200":
+          description: TOTP setup confirmed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recovery_codes:
+                    type: array
+                    items:
+                      type: string
+        "400":
+          description: Invalid code
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+
+  /authn/totp/verify:
+    post:
+      tags: [Authentication]
+      summary: Verify a TOTP code
+      operationId: totpVerify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                code:
+                  type: string
+              required:
+                - user_id
+                - code
+      responses:
+        "200":
+          description: Code valid
+        "401":
+          description: Invalid code
+
+  /authn/totp/recovery:
+    post:
+      tags: [Authentication]
+      summary: Use a recovery code
+      operationId: totpRecovery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                code:
+                  type: string
+              required:
+                - user_id
+                - code
+      responses:
+        "200":
+          description: Recovery code accepted
+        "401":
+          description: Invalid recovery code
+
+  # ---------------------------------------------------------------------------
+  # Authentication — Password
+  # ---------------------------------------------------------------------------
+  /authn/password/register:
+    post:
+      tags: [Authentication]
+      summary: Set password for a user
+      description: Only available when password authentication is enabled.
+      operationId: passwordRegister
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+                  format: password
+              required:
+                - password
+      responses:
+        "200":
+          description: Password set
+        "400":
+          description: Weak password or password auth disabled
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+
+  /authn/password/verify:
+    post:
+      tags: [Authentication]
+      summary: Verify a password
+      operationId: passwordVerify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                password:
+                  type: string
+                  format: password
+              required:
+                - user_id
+                - password
+      responses:
+        "200":
+          description: Password valid
+        "401":
+          description: Invalid credentials
+
+  /authn/password/change:
+    post:
+      tags: [Authentication]
+      summary: Change password
+      operationId: passwordChange
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                current_password:
+                  type: string
+                  format: password
+                new_password:
+                  type: string
+                  format: password
+              required:
+                - current_password
+                - new_password
+      responses:
+        "200":
+          description: Password changed
+        "400":
+          description: Weak password or current password incorrect
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+
+  # ---------------------------------------------------------------------------
+  # Authentication — Social Login
+  # ---------------------------------------------------------------------------
+  /authn/social/{provider}/authorize:
+    get:
+      tags: [Authentication]
+      summary: Start social login
+      description: Redirects to the social provider's authorization page.
+      operationId: socialAuthorize
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, github]
+      responses:
+        "302":
+          description: Redirect to social provider
+
+  /authn/social/{provider}/callback:
+    get:
+      tags: [Authentication]
+      summary: Social login callback
+      description: Handles the OAuth2 callback from the social provider.
+      operationId: socialCallback
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, github]
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect back to the application
+        "400":
+          description: Invalid callback
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+
+  # ---------------------------------------------------------------------------
+  # Admin API — Users
+  # ---------------------------------------------------------------------------
+  /api/v1/users:
+    post:
+      tags: [Users]
+      summary: Create a user
+      operationId: createUser
+      security:
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: User already exists
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    get:
+      tags: [Users]
+      summary: List users
+      operationId: listUsers
+      security:
+        - apiKey: []
+      parameters:
+        - $ref: "#/components/parameters/cursor"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Paginated list of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+                  next_cursor:
+                    type: string
+
+  /api/v1/users/{id}:
+    get:
+      tags: [Users]
+      summary: Get a user
+      operationId: getUser
+      security:
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: User not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    patch:
+      tags: [Users]
+      summary: Update a user
+      operationId: updateUser
+      security:
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: User not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags: [Users]
+      summary: Delete a user
+      operationId: deleteUser
+      security:
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: User deleted
+        "404":
+          description: User not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+
+  # ---------------------------------------------------------------------------
+  # Admin API — Organizations
+  # ---------------------------------------------------------------------------
+  /api/v1/orgs:
+    post:
+      tags: [Organizations]
+      summary: Create an organization
+      operationId: createOrg
+      security:
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrgRequest"
+      responses:
+        "201":
+          description: Organization created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "409":
+          description: Organization slug already exists
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    get:
+      tags: [Organizations]
+      summary: List organizations
+      operationId: listOrgs
+      security:
+        - apiKey: []
+      parameters:
+        - $ref: "#/components/parameters/cursor"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Paginated list of organizations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Organization"
+                  next_cursor:
+                    type: string
+
+  /api/v1/orgs/{slug}:
+    get:
+      tags: [Organizations]
+      summary: Get an organization
+      operationId: getOrg
+      security:
+        - apiKey: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Organization details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "404":
+          description: Organization not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    patch:
+      tags: [Organizations]
+      summary: Update an organization
+      operationId: updateOrg
+      security:
+        - apiKey: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrgRequest"
+      responses:
+        "200":
+          description: Organization updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "404":
+          description: Organization not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags: [Organizations]
+      summary: Delete an organization
+      operationId: deleteOrg
+      security:
+        - apiKey: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Organization deleted
+        "404":
+          description: Organization not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+
+  # ---------------------------------------------------------------------------
+  # Admin API — Organization Members
+  # ---------------------------------------------------------------------------
+  /api/v1/orgs/{slug}/members:
+    post:
+      tags: [Organizations]
+      summary: Add a member to an organization
+      operationId: addMember
+      security:
+        - apiKey: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                role:
+                  type: string
+              required:
+                - user_id
+                - role
+      responses:
+        "201":
+          description: Member added
+        "404":
+          description: Organization or user not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    get:
+      tags: [Organizations]
+      summary: List organization members
+      operationId: listMembers
+      security:
+        - apiKey: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/cursor"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Paginated list of members
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Member"
+                  next_cursor:
+                    type: string
+
+  /api/v1/orgs/{slug}/members/{user_id}:
+    patch:
+      tags: [Organizations]
+      summary: Update a member's role
+      operationId: updateMemberRole
+      security:
+        - apiKey: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+              required:
+                - role
+      responses:
+        "200":
+          description: Member role updated
+        "404":
+          description: Member not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags: [Organizations]
+      summary: Remove a member from an organization
+      operationId: removeMember
+      security:
+        - apiKey: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Member removed
+        "404":
+          description: Member not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+
+  # ---------------------------------------------------------------------------
+  # Admin API — Roles
+  # ---------------------------------------------------------------------------
+  /api/v1/orgs/{slug}/roles:
+    post:
+      tags: [Roles]
+      summary: Create a role
+      operationId: createRole
+      security:
+        - apiKey: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoleRequest"
+      responses:
+        "201":
+          description: Role created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+        "409":
+          description: Role name already exists in this organization
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    get:
+      tags: [Roles]
+      summary: List roles in an organization
+      operationId: listRoles
+      security:
+        - apiKey: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Role"
+
+  /api/v1/orgs/{slug}/roles/{name}:
+    patch:
+      tags: [Roles]
+      summary: Update a role
+      operationId: updateRole
+      security:
+        - apiKey: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                permissions:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Role updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+        "404":
+          description: Role not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags: [Roles]
+      summary: Delete a role
+      operationId: deleteRole
+      security:
+        - apiKey: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Role deleted
+        "404":
+          description: Role not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+
+  # ---------------------------------------------------------------------------
+  # Admin API — Audit Logs
+  # ---------------------------------------------------------------------------
+  /api/v1/audit-logs:
+    get:
+      tags: [Audit]
+      summary: List audit logs
+      operationId: listAuditLogs
+      security:
+        - apiKey: []
+      parameters:
+        - $ref: "#/components/parameters/cursor"
+        - $ref: "#/components/parameters/limit"
+        - name: actor_id
+          in: query
+          schema:
+            type: string
+          description: Filter by actor (user) ID
+        - name: action
+          in: query
+          schema:
+            type: string
+          description: Filter by action type
+      responses:
+        "200":
+          description: Paginated list of audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditLogEntry"
+                  next_cursor:
+                    type: string
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: "API key passed as Bearer token: `Authorization: Bearer <API_KEY>`"
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token obtained from the /token endpoint
+
+  parameters:
+    cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+      description: Pagination cursor from a previous response's next_cursor field
+    limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+      description: Maximum number of items to return
+
+  schemas:
+    ProblemDetail:
+      type: object
+      description: RFC 7807 Problem Details
+      properties:
+        type:
+          type: string
+          description: A URI reference that identifies the problem type
+          example: "about:blank"
+        title:
+          type: string
+          description: A short, human-readable summary
+          example: "Not Found"
+        status:
+          type: integer
+          description: The HTTP status code
+          example: 404
+        detail:
+          type: string
+          description: A human-readable explanation specific to this occurrence
+          example: "user not found"
+      required:
+        - type
+        - title
+        - status
+        - detail
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        email_verified:
+          type: boolean
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+      required:
+        - email
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    Organization:
+      type: object
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        name:
+          type: string
+        domains:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateOrgRequest:
+      type: object
+      properties:
+        slug:
+          type: string
+          pattern: "^[a-z0-9-]+$"
+        name:
+          type: string
+        domains:
+          type: array
+          items:
+            type: string
+      required:
+        - slug
+        - name
+
+    UpdateOrgRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        domains:
+          type: array
+          items:
+            type: string
+
+    Member:
+      type: object
+      properties:
+        user_id:
+          type: string
+        org_id:
+          type: string
+        role:
+          type: string
+        joined_at:
+          type: string
+          format: date-time
+
+    Role:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+
+    CreateRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+      required:
+        - name
+        - permissions
+
+    AuditLogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        actor_id:
+          type: string
+        action:
+          type: string
+        resource_type:
+          type: string
+        resource_id:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    PasskeyCredential:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
