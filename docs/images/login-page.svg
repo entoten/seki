@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 560" fill="none">
+  <defs>
+    <filter id="shadow" x="-4%" y="-4%" width="108%" height="108%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity="0.1"/>
+    </filter>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#f1f5f9"/>
+    </linearGradient>
+    <linearGradient id="btn-primary" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="btn-social" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#f9fafb"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Browser chrome -->
+  <rect width="800" height="560" rx="8" fill="#e5e7eb"/>
+  <!-- Title bar -->
+  <rect width="800" height="36" rx="8" fill="#f3f4f6"/>
+  <rect y="20" width="800" height="16" fill="#f3f4f6"/>
+  <circle cx="20" cy="18" r="6" fill="#ef4444"/>
+  <circle cx="40" cy="18" r="6" fill="#f59e0b"/>
+  <circle cx="60" cy="18" r="6" fill="#22c55e"/>
+  <!-- URL bar -->
+  <rect x="120" y="8" width="560" height="20" rx="4" fill="#e5e7eb"/>
+  <text x="140" y="22" font-family="monospace" font-size="11" fill="#6b7280">https://auth.example.com/login</text>
+
+  <!-- Page background -->
+  <rect y="36" width="800" height="524" fill="url(#bg)"/>
+
+  <!-- Login card -->
+  <rect x="200" y="72" width="400" height="448" rx="12" fill="white" filter="url(#shadow)"/>
+
+  <!-- Logo area -->
+  <rect x="350" y="96" width="44" height="44" rx="8" fill="url(#btn-primary)"/>
+  <text x="360" y="126" font-family="sans-serif" font-size="22" font-weight="bold" fill="white">関</text>
+  <text x="372" y="160" font-family="-apple-system, sans-serif" font-size="20" font-weight="600" fill="#1e1b4b" text-anchor="middle">Sign in to seki</text>
+  <text x="372" y="180" font-family="-apple-system, sans-serif" font-size="13" fill="#9ca3af" text-anchor="middle">Choose your authentication method</text>
+
+  <!-- Passkey button (primary) -->
+  <rect x="240" y="200" width="320" height="44" rx="8" fill="url(#btn-primary)"/>
+  <text x="310" y="227" font-family="-apple-system, sans-serif" font-size="14" fill="white">🔑</text>
+  <text x="335" y="227" font-family="-apple-system, sans-serif" font-size="14" font-weight="500" fill="white">Sign in with Passkey</text>
+
+  <!-- Divider -->
+  <line x1="240" y1="264" x2="340" y2="264" stroke="#e5e7eb" stroke-width="1"/>
+  <text x="372" y="268" font-family="-apple-system, sans-serif" font-size="12" fill="#9ca3af" text-anchor="middle">or</text>
+  <line x1="404" y1="264" x2="560" y2="264" stroke="#e5e7eb" stroke-width="1"/>
+
+  <!-- Email input -->
+  <text x="240" y="296" font-family="-apple-system, sans-serif" font-size="13" font-weight="500" fill="#374151">Email</text>
+  <rect x="240" y="302" width="320" height="40" rx="6" fill="white" stroke="#d1d5db" stroke-width="1"/>
+  <text x="256" y="327" font-family="-apple-system, sans-serif" font-size="14" fill="#9ca3af">you@company.com</text>
+
+  <!-- Send Code button -->
+  <rect x="240" y="354" width="320" height="40" rx="6" fill="white" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="372" y="379" font-family="-apple-system, sans-serif" font-size="14" font-weight="500" fill="#6366f1" text-anchor="middle">Send verification code</text>
+
+  <!-- Social login buttons -->
+  <rect x="240" y="414" width="155" height="40" rx="6" fill="url(#btn-social)" stroke="#d1d5db" stroke-width="1"/>
+  <text x="280" y="439" font-family="-apple-system, sans-serif" font-size="13" font-weight="500" fill="#374151">Google</text>
+  <circle cx="262" cy="434" r="8" fill="#4285f4"/>
+  <text x="258" y="438" font-family="sans-serif" font-size="10" font-weight="bold" fill="white">G</text>
+
+  <rect x="405" y="414" width="155" height="40" rx="6" fill="url(#btn-social)" stroke="#d1d5db" stroke-width="1"/>
+  <text x="445" y="439" font-family="-apple-system, sans-serif" font-size="13" font-weight="500" fill="#374151">GitHub</text>
+  <circle cx="427" cy="434" r="8" fill="#24292f"/>
+
+  <!-- TOTP link -->
+  <text x="372" y="484" font-family="-apple-system, sans-serif" font-size="13" fill="#6366f1" text-anchor="middle" text-decoration="underline">Sign in with TOTP code</text>
+
+  <!-- Footer -->
+  <text x="372" y="508" font-family="-apple-system, sans-serif" font-size="11" fill="#9ca3af" text-anchor="middle">Secured by seki — OIDC first, Passkey first, API first</text>
+</svg>
