@@ -4,8 +4,68 @@ server:
 
 database:
   driver: postgres
-  dsn: "postgres://seki:secret@postgres:5432/seki?sslmode=disable"
+  dsn: "postgres://seki:${POSTGRES_PASSWORD:-secret}@postgres:5432/seki?sslmode=disable"
 
 signing:
   algorithm: EdDSA
   key_file: /app/keys/signing.key
+
+clients:
+  - id: my-saas-app
+    name: "My SaaS Application"
+    redirect_uris:
+      - "http://localhost:3000/callback"
+    grant_types:
+      - authorization_code
+    scopes:
+      - openid
+      - profile
+      - email
+    pkce_required: true
+
+organizations:
+  - slug: default
+    name: "Default Organization"
+    domains: []
+    roles:
+      - name: admin
+        permissions: ["org:manage", "users:write", "audit:read"]
+      - name: member
+        permissions: ["users:read"]
+
+authentication:
+  passkey:
+    enabled: true
+    rp_name: "seki"
+    rp_id: "localhost"
+  totp:
+    enabled: true
+    issuer: "seki"
+  password:
+    enabled: false
+  social:
+    google:
+      client_id: "${GOOGLE_CLIENT_ID}"
+      client_secret: "${GOOGLE_CLIENT_SECRET}"
+    github:
+      client_id: "${GITHUB_CLIENT_ID}"
+      client_secret: "${GITHUB_CLIENT_SECRET}"
+
+audit:
+  output: stdout
+  retention_days: 90
+
+webhooks:
+  events:
+    - user.created
+    - user.login
+    - user.login.failed
+    - user.logout
+    - org.member.added
+    - org.member.removed
+    - token.issued
+    - passkey.registered
+  endpoints: []
+
+admin:
+  api_keys: []

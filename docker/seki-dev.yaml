@@ -1,0 +1,59 @@
+server:
+  address: ":8080"
+  issuer: "http://localhost:8080"
+
+database:
+  driver: sqlite
+  dsn: "/app/data/seki-dev.db"
+
+signing:
+  algorithm: EdDSA
+  key_file: /app/keys/signing.key
+
+clients:
+  - id: dev-app
+    name: "Development App"
+    redirect_uris:
+      - "http://localhost:3000/callback"
+      - "http://localhost:5173/callback"
+    grant_types:
+      - authorization_code
+    scopes:
+      - openid
+      - profile
+      - email
+    pkce_required: true
+
+organizations:
+  - slug: dev-org
+    name: "Development Org"
+    domains: []
+    roles:
+      - name: admin
+        permissions: ["org:manage", "users:write", "audit:read"]
+      - name: member
+        permissions: ["users:read"]
+
+authentication:
+  passkey:
+    enabled: true
+    rp_name: "seki-dev"
+    rp_id: "localhost"
+  totp:
+    enabled: true
+    issuer: "seki-dev"
+  password:
+    enabled: true
+  social: {}
+
+audit:
+  output: stdout
+  retention_days: 30
+
+webhooks:
+  events: []
+  endpoints: []
+
+admin:
+  api_keys:
+    - "dev-api-key-change-me"

@@ -4,12 +4,26 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     ports:
-      - "8080:8080"
+      - "${SEKI_PORT:-8080}:8080"
     volumes:
       - ./seki.yaml:/app/seki.yaml:ro
+      - seki-keys:/app/keys
       - seki-data:/app/data
     environment:
       - SEKI_CONFIG=/app/seki.yaml
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
 
 volumes:
+  seki-keys:
   seki-data:

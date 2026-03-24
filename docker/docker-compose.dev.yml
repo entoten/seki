@@ -1,0 +1,24 @@
+services:
+  seki-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./seki-dev.yaml:/app/seki.yaml:ro
+      - seki-dev-data:/app/data
+      - seki-dev-keys:/app/keys
+    environment:
+      - SEKI_CONFIG=/app/seki.yaml
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+volumes:
+  seki-dev-data:
+  seki-dev-keys:
