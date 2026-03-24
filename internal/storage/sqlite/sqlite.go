@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Monet/seki/internal/config"
 	"github.com/Monet/seki/internal/storage"
 
 	_ "modernc.org/sqlite"
@@ -23,9 +24,10 @@ type Store struct {
 	db *sql.DB
 }
 
-// New opens a SQLite database at the given DSN (file path or ":memory:").
-func New(dsn string) (*Store, error) {
-	db, err := sql.Open("sqlite", dsn)
+// New opens a SQLite database at the given DSN (file path or ":memory:")
+// and applies connection pool settings from the config.
+func New(cfg config.DatabaseConfig) (*Store, error) {
+	db, err := sql.Open("sqlite", cfg.DSN)
 	if err != nil {
 		return nil, fmt.Errorf("sqlite: open: %w", err)
 	}
@@ -40,7 +42,25 @@ func New(dsn string) (*Store, error) {
 			return nil, fmt.Errorf("sqlite: pragma %q: %w", pragma, err)
 		}
 	}
+	// Apply connection pool settings.
+	applyPoolSettings(db, cfg)
 	return &Store{db: db}, nil
+}
+
+// applyPoolSettings configures the connection pool on the sql.DB.
+func applyPoolSettings(db *sql.DB, cfg config.DatabaseConfig) {
+	if cfg.MaxOpenConns > 0 {
+		db.SetMaxOpenConns(cfg.MaxOpenConns)
+	}
+	if cfg.MaxIdleConns > 0 {
+		db.SetMaxIdleConns(cfg.MaxIdleConns)
+	}
+	if d, err := time.ParseDuration(cfg.ConnMaxLifetime); err == nil {
+		db.SetConnMaxLifetime(d)
+	}
+	if d, err := time.ParseDuration(cfg.ConnMaxIdleTime); err == nil {
+		db.SetConnMaxIdleTime(d)
+	}
 }
 
 // Migrate runs all embedded up migrations against the database in order.

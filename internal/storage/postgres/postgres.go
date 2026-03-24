@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Monet/seki/internal/config"
 	"github.com/Monet/seki/internal/storage"
 
 	"github.com/jackc/pgx/v5"
@@ -26,8 +27,26 @@ type Store struct {
 }
 
 // New creates a new PostgreSQL-backed store with a connection pool.
-func New(ctx context.Context, dsn string) (*Store, error) {
-	pool, err := pgxpool.New(ctx, dsn)
+// Pool settings from the config are applied to the underlying pgxpool.
+func New(ctx context.Context, cfg config.DatabaseConfig) (*Store, error) {
+	poolCfg, err := pgxpool.ParseConfig(cfg.DSN)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: parse config: %w", err)
+	}
+	// Apply connection pool settings.
+	if cfg.MaxOpenConns > 0 {
+		poolCfg.MaxConns = int32(cfg.MaxOpenConns)
+	}
+	if cfg.MaxIdleConns > 0 {
+		poolCfg.MinConns = int32(cfg.MaxIdleConns)
+	}
+	if d, parseErr := time.ParseDuration(cfg.ConnMaxLifetime); parseErr == nil {
+		poolCfg.MaxConnLifetime = d
+	}
+	if d, parseErr := time.ParseDuration(cfg.ConnMaxIdleTime); parseErr == nil {
+		poolCfg.MaxConnIdleTime = d
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: connect: %w", err)
 	}

@@ -14,6 +14,13 @@ type Config struct {
 	Admin          AdminConfig           `yaml:"admin"`
 	RateLimit      RateLimitConfig       `yaml:"rate_limit"`
 	CORS           CORSConfig            `yaml:"cors"`
+	Log            LogConfig             `yaml:"log"`
+}
+
+// LogConfig holds structured logging settings.
+type LogConfig struct {
+	Level  string `yaml:"level"`  // debug, info, warn, error (default: info)
+	Format string `yaml:"format"` // json, text (default: json)
 }
 
 // RateLimitConfig holds rate limiting and brute-force protection settings.
@@ -52,8 +59,12 @@ type SessionConfig struct {
 
 // DatabaseConfig holds database connection settings.
 type DatabaseConfig struct {
-	Driver string `yaml:"driver"`
-	DSN    string `yaml:"dsn"`
+	Driver          string `yaml:"driver"`
+	DSN             string `yaml:"dsn"`
+	MaxOpenConns    int    `yaml:"max_open_conns"`    // default: 25
+	MaxIdleConns    int    `yaml:"max_idle_conns"`    // default: 5
+	ConnMaxLifetime string `yaml:"conn_max_lifetime"` // default: "5m"
+	ConnMaxIdleTime string `yaml:"conn_max_idle_time"` // default: "1m"
 }
 
 // SigningConfig holds token signing settings.

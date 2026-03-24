@@ -66,7 +66,8 @@ func New(cfg *config.Config, store storage.Storage, signer crypto.Signer) *Serve
 		limiter = ratelimit.NewLimiter(cfg.RateLimit)
 	}
 
-	// Build middleware chain: SecurityHeaders -> CORS -> RateLimit -> Metrics -> Router
+	// Build middleware chain (outermost first):
+	// RequestID -> Recovery -> SecurityHeaders -> CORS -> RateLimit -> Metrics -> Router
 	var handler http.Handler = mux
 	handler = metrics.Middleware(handler)
 	if limiter != nil {
@@ -74,6 +75,8 @@ func New(cfg *config.Config, store storage.Storage, signer crypto.Signer) *Serve
 	}
 	handler = middleware.CORS(cfg.CORS)(handler)
 	handler = middleware.SecurityHeaders()(handler)
+	handler = middleware.Recovery()(handler)
+	handler = middleware.RequestID()(handler)
 
 	s := &Server{
 		cfg:      cfg,

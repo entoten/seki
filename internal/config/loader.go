@@ -64,6 +64,26 @@ func applyDefaults(cfg *Config) {
 	if cfg.Audit.Output == "" {
 		cfg.Audit.Output = "stdout"
 	}
+	// Log defaults.
+	if cfg.Log.Level == "" {
+		cfg.Log.Level = "info"
+	}
+	if cfg.Log.Format == "" {
+		cfg.Log.Format = "json"
+	}
+	// Database connection pool defaults.
+	if cfg.Database.MaxOpenConns == 0 {
+		cfg.Database.MaxOpenConns = 25
+	}
+	if cfg.Database.MaxIdleConns == 0 {
+		cfg.Database.MaxIdleConns = 5
+	}
+	if cfg.Database.ConnMaxLifetime == "" {
+		cfg.Database.ConnMaxLifetime = "5m"
+	}
+	if cfg.Database.ConnMaxIdleTime == "" {
+		cfg.Database.ConnMaxIdleTime = "1m"
+	}
 }
 
 // validate checks that required fields are present and values are acceptable.

@@ -8,7 +8,7 @@ import (
 
 // NewFunc is the type for driver-specific constructor functions.
 // Drivers register themselves so the factory can remain decoupled.
-type NewFunc func(dsn string) (Storage, error)
+type NewFunc func(cfg config.DatabaseConfig) (Storage, error)
 
 var drivers = map[string]NewFunc{}
 
@@ -23,7 +23,7 @@ func New(cfg config.DatabaseConfig) (Storage, error) {
 	if !ok {
 		return nil, fmt.Errorf("storage: unknown driver %q (registered: %v)", cfg.Driver, driverNames())
 	}
-	return fn(cfg.DSN)
+	return fn(cfg)
 }
 
 func driverNames() []string {

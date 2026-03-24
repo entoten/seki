@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Monet/seki/internal/config"
 	"github.com/Monet/seki/internal/storage"
 	"github.com/Monet/seki/internal/storage/sqlite"
 )
@@ -12,7 +13,7 @@ import (
 func setupTest(t *testing.T) (*Service, storage.Storage, *storage.User) {
 	t.Helper()
 
-	store, err := sqlite.New(":memory:")
+	store, err := sqlite.New(config.DatabaseConfig{Driver: "sqlite", DSN: ":memory:"})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}

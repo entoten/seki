@@ -4,16 +4,19 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"sort"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/Monet/seki/internal/admin"
 	"github.com/Monet/seki/internal/config"
 	"github.com/Monet/seki/internal/crypto"
+	"github.com/Monet/seki/internal/logging"
 	"github.com/Monet/seki/internal/oidc"
 	"github.com/Monet/seki/internal/server"
 	"github.com/Monet/seki/internal/storage"
@@ -46,10 +49,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.Printf("seki v%s starting", version)
-	log.Printf("issuer:   %s", cfg.Server.Issuer)
-	log.Printf("address:  %s", cfg.Server.Address)
-	log.Printf("database: %s", cfg.Database.Driver)
+	// Set up structured logging.
+	logger := logging.Setup(cfg.Log.Level, cfg.Log.Format)
+
+	// Print startup banner.
+	printBanner(cfg)
 
 	// Initialize the token signer.
 	signer, err := crypto.NewEd25519Signer(crypto.Ed25519SignerOptions{
@@ -57,21 +61,21 @@ func main() {
 		Issuer:  cfg.Server.Issuer,
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error initializing signer: %v\n", err)
+		logger.Error("failed to initialize signer", "error", err)
 		os.Exit(1)
 	}
 
 	// Initialize the storage layer.
 	store, err := storage.New(cfg.Database)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error initializing storage: %v\n", err)
+		logger.Error("failed to initialize storage", "error", err)
 		os.Exit(1)
 	}
 	defer store.Close()
 
 	// Run database migrations.
 	if err := store.Migrate(); err != nil {
-		fmt.Fprintf(os.Stderr, "error running migrations: %v\n", err)
+		logger.Error("failed to run migrations", "error", err)
 		os.Exit(1)
 	}
 
@@ -79,18 +83,18 @@ func main() {
 	ctx := context.Background()
 	if len(cfg.Clients) > 0 {
 		if err := oidc.SeedClientsFromConfig(ctx, store, cfg.Clients); err != nil {
-			log.Printf("warning: failed to seed clients: %v", err)
+			logger.Warn("failed to seed clients", "error", err)
 		} else {
-			log.Printf("seeded %d client(s) from config", len(cfg.Clients))
+			logger.Info("seeded clients from config", "count", len(cfg.Clients))
 		}
 	}
 
 	// Seed organizations from config.
 	if len(cfg.Organizations) > 0 {
 		if err := admin.SeedOrgsFromConfig(ctx, store, cfg.Organizations); err != nil {
-			log.Printf("warning: failed to seed organizations: %v", err)
+			logger.Warn("failed to seed organizations", "error", err)
 		} else {
-			log.Printf("seeded %d organization(s) from config", len(cfg.Organizations))
+			logger.Info("seeded organizations from config", "count", len(cfg.Organizations))
 		}
 	}
 
@@ -98,59 +102,132 @@ func main() {
 	// OIDC provider, admin handler, and authn routes internally).
 	srv := server.New(cfg, store, signer)
 
-	log.Printf("audit output: %s", cfg.Audit.Output)
-	if len(cfg.Webhooks.Endpoints) > 0 {
-		log.Printf("webhook endpoints: %d", len(cfg.Webhooks.Endpoints))
-	}
-	if len(cfg.Admin.APIKeys) > 0 {
-		log.Printf("admin API keys configured: %d", len(cfg.Admin.APIKeys))
-	}
-
-	// Log authentication methods.
-	if cfg.Authentication.Passkey.Enabled {
-		log.Printf("authn: passkey enabled (rp_id=%s)", cfg.Authentication.Passkey.RPID)
-	}
-	if cfg.Authentication.TOTP.Enabled {
-		log.Printf("authn: totp enabled")
-	}
-	if cfg.Authentication.Password.Enabled {
-		log.Printf("authn: password enabled")
-	}
-	if len(cfg.Authentication.Social) > 0 {
-		for name := range cfg.Authentication.Social {
-			log.Printf("authn: social provider %q configured", name)
-		}
-	}
-
 	// Start server in a goroutine.
 	errCh := make(chan error, 1)
 	go func() {
-		log.Printf("listening on %s", cfg.Server.Address)
+		logger.Info("server listening", "address", cfg.Server.Address)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			errCh <- err
 		}
 	}()
 
-	// Wait for interrupt signal or server error.
+	// Listen for SIGINT/SIGTERM (shutdown) and SIGHUP (config reload).
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
-	select {
-	case sig := <-quit:
-		log.Printf("received signal %s, shutting down", sig)
-	case err := <-errCh:
-		log.Printf("server error: %v", err)
-		os.Exit(1)
+	for {
+		select {
+		case sig := <-quit:
+			if sig == syscall.SIGHUP {
+				handleReload(*configPath, cfg, srv, logger)
+				continue
+			}
+			logger.Info("received shutdown signal", "signal", sig.String())
+			goto shutdown
+		case err := <-errCh:
+			logger.Error("server error", "error", err)
+			os.Exit(1)
+		}
 	}
 
+shutdown:
 	// Graceful shutdown with timeout.
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("shutdown error: %v", err)
+		logger.Error("shutdown error", "error", err)
 		os.Exit(1)
 	}
 
-	log.Printf("server stopped")
+	logger.Info("server stopped")
+}
+
+// handleReload re-reads the config file and applies hot-reloadable settings.
+func handleReload(configPath string, current *config.Config, srv *server.Server, logger *slog.Logger) {
+	logger.Info("SIGHUP received, reloading configuration", "path", configPath)
+
+	newCfg, err := config.Load(configPath)
+	if err != nil {
+		logger.Error("config reload failed", "error", err)
+		return
+	}
+
+	var reloaded []string
+
+	// Hot-reload log level.
+	if newCfg.Log.Level != current.Log.Level {
+		logging.SetLevel(newCfg.Log.Level)
+		logger.Info("log level updated", "old", current.Log.Level, "new", newCfg.Log.Level)
+		current.Log.Level = newCfg.Log.Level
+		reloaded = append(reloaded, "log.level")
+	}
+
+	// Hot-reload rate limit thresholds.
+	if newCfg.RateLimit.RequestsPerMin != current.RateLimit.RequestsPerMin ||
+		newCfg.RateLimit.LoginAttemptsMax != current.RateLimit.LoginAttemptsMax ||
+		newCfg.RateLimit.LockoutDuration != current.RateLimit.LockoutDuration ||
+		newCfg.RateLimit.Enabled != current.RateLimit.Enabled {
+		current.RateLimit = newCfg.RateLimit
+		reloaded = append(reloaded, "rate_limit")
+		logger.Info("rate limit config updated",
+			"enabled", newCfg.RateLimit.Enabled,
+			"requests_per_min", newCfg.RateLimit.RequestsPerMin,
+			"login_attempts_max", newCfg.RateLimit.LoginAttemptsMax,
+		)
+	}
+
+	if len(reloaded) == 0 {
+		logger.Info("config reload complete, no hot-reloadable changes detected")
+	} else {
+		logger.Info("config reload complete", "reloaded", reloaded)
+	}
+}
+
+// printBanner prints a human-readable startup summary.
+func printBanner(cfg *config.Config) {
+	var authMethods []string
+	if cfg.Authentication.Passkey.Enabled {
+		authMethods = append(authMethods, "passkey")
+	}
+	if cfg.Authentication.TOTP.Enabled {
+		authMethods = append(authMethods, "totp")
+	}
+	if cfg.Authentication.Password.Enabled {
+		authMethods = append(authMethods, "password")
+	}
+	if len(cfg.Authentication.Social) > 0 {
+		providers := make([]string, 0, len(cfg.Authentication.Social))
+		for name := range cfg.Authentication.Social {
+			providers = append(providers, name)
+		}
+		sort.Strings(providers)
+		authMethods = append(authMethods, providers...)
+	}
+	authStr := "none"
+	if len(authMethods) > 0 {
+		authStr = strings.Join(authMethods, ", ")
+	}
+
+	adminStatus := "disabled"
+	if len(cfg.Admin.APIKeys) > 0 {
+		adminStatus = fmt.Sprintf("enabled (%d key configured)", len(cfg.Admin.APIKeys))
+		if len(cfg.Admin.APIKeys) > 1 {
+			adminStatus = fmt.Sprintf("enabled (%d keys configured)", len(cfg.Admin.APIKeys))
+		}
+	}
+
+	scimStatus := "disabled"
+	if len(cfg.Admin.APIKeys) > 0 {
+		scimStatus = "enabled"
+	}
+
+	fmt.Printf("seki v%s\n", version)
+	fmt.Printf("  Issuer:     %s\n", cfg.Server.Issuer)
+	fmt.Printf("  Database:   %s\n", cfg.Database.Driver)
+	fmt.Printf("  Listening:  %s\n", cfg.Server.Address)
+	fmt.Printf("  Auth:       %s\n", authStr)
+	fmt.Printf("  Admin API:  %s\n", adminStatus)
+	fmt.Printf("  SCIM:       %s\n", scimStatus)
+	fmt.Printf("  Metrics:    /metrics\n")
 }
