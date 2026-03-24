@@ -418,6 +418,33 @@ func (s *Store) ListAuditLogs(ctx context.Context, opts storage.AuditListOptions
 	return entries, nextCursor, nil
 }
 
+func (s *Store) CountDistinctActors(ctx context.Context, action string, from, to time.Time) (int, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(DISTINCT actor_id) FROM audit_logs
+		 WHERE action = ? AND created_at >= ? AND created_at < ?`,
+		action, timeStr(from), timeStr(to),
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("sqlite: count distinct actors: %w", err)
+	}
+	return count, nil
+}
+
+func (s *Store) CountDistinctActorsByOrg(ctx context.Context, action string, from, to time.Time, orgID string) (int, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(DISTINCT a.actor_id) FROM audit_logs a
+		 INNER JOIN org_members m ON a.actor_id = m.user_id AND m.org_id = ?
+		 WHERE a.action = ? AND a.created_at >= ? AND a.created_at < ?`,
+		orgID, action, timeStr(from), timeStr(to),
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("sqlite: count distinct actors by org: %w", err)
+	}
+	return count, nil
+}
+
 // ---------------------------------------------------------------------------
 // AuthCodeStore
 // ---------------------------------------------------------------------------
@@ -696,12 +723,13 @@ func scanCredentialRow(row scanner) (*storage.Credential, error) {
 
 func (s *Store) CreateOrg(ctx context.Context, org *storage.Organization) error {
 	domains, _ := json.Marshal(org.Domains)
+	branding, _ := json.Marshal(org.Branding)
 	meta := normalizeJSON(org.Metadata)
 	now := timeStr(org.CreatedAt)
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO organizations (id, slug, name, domains, metadata, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		org.ID, org.Slug, org.Name, string(domains), meta, now, now,
+		`INSERT INTO organizations (id, slug, name, domains, branding, metadata, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		org.ID, org.Slug, org.Name, string(domains), string(branding), meta, now, now,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -714,26 +742,52 @@ func (s *Store) CreateOrg(ctx context.Context, org *storage.Organization) error 
 
 func (s *Store) GetOrg(ctx context.Context, id string) (*storage.Organization, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, slug, name, domains, metadata, created_at, updated_at
+		`SELECT id, slug, name, domains, branding, metadata, created_at, updated_at
 		 FROM organizations WHERE id = ?`, id)
 	return scanOrg(row)
 }
 
 func (s *Store) GetOrgBySlug(ctx context.Context, slug string) (*storage.Organization, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, slug, name, domains, metadata, created_at, updated_at
+		`SELECT id, slug, name, domains, branding, metadata, created_at, updated_at
 		 FROM organizations WHERE slug = ?`, slug)
 	return scanOrg(row)
 }
 
+func (s *Store) GetOrgByDomain(ctx context.Context, domain string) (*storage.Organization, error) {
+	// SQLite stores domains as a JSON array in a TEXT column.
+	// We search for orgs where the domains array contains the given domain.
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, slug, name, domains, branding, metadata, created_at, updated_at
+		 FROM organizations`)
+	if err != nil {
+		return nil, fmt.Errorf("sqlite: get org by domain: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		org, err := scanOrgFromRows(rows)
+		if err != nil {
+			return nil, err
+		}
+		for _, d := range org.Domains {
+			if d == domain {
+				return org, nil
+			}
+		}
+	}
+	return nil, storage.ErrNotFound
+}
+
 func (s *Store) UpdateOrg(ctx context.Context, org *storage.Organization) error {
 	domains, _ := json.Marshal(org.Domains)
+	branding, _ := json.Marshal(org.Branding)
 	meta := normalizeJSON(org.Metadata)
 	now := timeStr(time.Now().UTC())
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE organizations SET slug = ?, name = ?, domains = ?, metadata = ?, updated_at = ?
+		`UPDATE organizations SET slug = ?, name = ?, domains = ?, branding = ?, metadata = ?, updated_at = ?
 		 WHERE id = ?`,
-		org.Slug, org.Name, string(domains), meta, now, org.ID,
+		org.Slug, org.Name, string(domains), string(branding), meta, now, org.ID,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -761,13 +815,13 @@ func (s *Store) ListOrgs(ctx context.Context, opts storage.ListOptions) ([]*stor
 	var err error
 	if opts.Cursor != "" {
 		rows, err = s.db.QueryContext(ctx,
-			`SELECT id, slug, name, domains, metadata, created_at, updated_at
+			`SELECT id, slug, name, domains, branding, metadata, created_at, updated_at
 			 FROM organizations WHERE id > ? ORDER BY id ASC LIMIT ?`,
 			opts.Cursor, limit+1,
 		)
 	} else {
 		rows, err = s.db.QueryContext(ctx,
-			`SELECT id, slug, name, domains, metadata, created_at, updated_at
+			`SELECT id, slug, name, domains, branding, metadata, created_at, updated_at
 			 FROM organizations ORDER BY id ASC LIMIT ?`,
 			limit+1,
 		)
@@ -779,7 +833,7 @@ func (s *Store) ListOrgs(ctx context.Context, opts storage.ListOptions) ([]*stor
 
 	var orgs []*storage.Organization
 	for rows.Next() {
-		o, err := scanOrg(rows)
+		o, err := scanOrgFromRows(rows)
 		if err != nil {
 			return nil, "", err
 		}
@@ -943,9 +997,9 @@ func (s *Store) DeleteRole(ctx context.Context, id string) error {
 
 func scanOrg(row scanner) (*storage.Organization, error) {
 	var o storage.Organization
-	var domains, meta string
+	var domains, branding, meta string
 	var createdAt, updatedAt string
-	err := row.Scan(&o.ID, &o.Slug, &o.Name, &domains, &meta, &createdAt, &updatedAt)
+	err := row.Scan(&o.ID, &o.Slug, &o.Name, &domains, &branding, &meta, &createdAt, &updatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, storage.ErrNotFound
@@ -953,10 +1007,15 @@ func scanOrg(row scanner) (*storage.Organization, error) {
 		return nil, fmt.Errorf("sqlite: scan org: %w", err)
 	}
 	_ = json.Unmarshal([]byte(domains), &o.Domains)
+	_ = json.Unmarshal([]byte(branding), &o.Branding)
 	o.Metadata = json.RawMessage(meta)
 	o.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 	o.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
 	return &o, nil
+}
+
+func scanOrgFromRows(rows *sql.Rows) (*storage.Organization, error) {
+	return scanOrg(rows)
 }
 
 func scanMember(row scanner) (*storage.OrgMember, error) {
@@ -1184,4 +1243,178 @@ func (s *Store) DeleteExpiredTokens(ctx context.Context) (int64, error) {
 	}
 	n, _ := res.RowsAffected()
 	return n, nil
+}
+
+// ---------------------------------------------------------------------------
+// PATStore
+// ---------------------------------------------------------------------------
+
+func (s *Store) CreatePAT(ctx context.Context, pat *storage.PersonalAccessToken) error {
+	scopes, _ := json.Marshal(pat.Scopes)
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO personal_access_tokens (id, user_id, name, token_hash, scopes, expires_at, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		pat.ID, pat.UserID, pat.Name, pat.TokenHash,
+		string(scopes), timeStr(pat.ExpiresAt), timeStr(pat.CreatedAt),
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("sqlite: create pat: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetPATByHash(ctx context.Context, hash string) (*storage.PersonalAccessToken, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, user_id, name, token_hash, scopes, expires_at, last_used_at, created_at
+		 FROM personal_access_tokens WHERE token_hash = ?`, hash)
+	return scanPAT(row)
+}
+
+func (s *Store) ListPATsByUser(ctx context.Context, userID string) ([]*storage.PersonalAccessToken, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, user_id, name, token_hash, scopes, expires_at, last_used_at, created_at
+		 FROM personal_access_tokens WHERE user_id = ? ORDER BY created_at DESC`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("sqlite: list pats: %w", err)
+	}
+	defer rows.Close()
+
+	var pats []*storage.PersonalAccessToken
+	for rows.Next() {
+		p, err := scanPAT(rows)
+		if err != nil {
+			return nil, err
+		}
+		pats = append(pats, p)
+	}
+	return pats, rows.Err()
+}
+
+func (s *Store) DeletePAT(ctx context.Context, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM personal_access_tokens WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("sqlite: delete pat: %w", err)
+	}
+	return checkRowsAffected(res, "personal_access_token")
+}
+
+func (s *Store) UpdatePATLastUsed(ctx context.Context, id string, lastUsed time.Time) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE personal_access_tokens SET last_used_at = ? WHERE id = ?`,
+		timeStr(lastUsed), id)
+	if err != nil {
+		return fmt.Errorf("sqlite: update pat last_used: %w", err)
+	}
+	return nil
+}
+
+func scanPAT(row scanner) (*storage.PersonalAccessToken, error) {
+	var p storage.PersonalAccessToken
+	var scopes string
+	var expiresAt, createdAt string
+	var lastUsedAt sql.NullString
+	err := row.Scan(&p.ID, &p.UserID, &p.Name, &p.TokenHash, &scopes, &expiresAt, &lastUsedAt, &createdAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("sqlite: scan pat: %w", err)
+	}
+	_ = json.Unmarshal([]byte(scopes), &p.Scopes)
+	p.ExpiresAt, _ = time.Parse(time.RFC3339, expiresAt)
+	p.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	if lastUsedAt.Valid {
+		parsed, _ := time.Parse(time.RFC3339, lastUsedAt.String)
+		p.LastUsedAt = &parsed
+	}
+	return &p, nil
+}
+
+// ---------------------------------------------------------------------------
+// DeviceCodeStore
+// ---------------------------------------------------------------------------
+
+func (s *Store) CreateDeviceCode(ctx context.Context, dc *storage.DeviceCode) error {
+	scopes, _ := json.Marshal(dc.Scopes)
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO device_codes (device_code, user_code, client_id, scopes, status, user_id, expires_at, interval, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		dc.DeviceCode, dc.UserCode, dc.ClientID,
+		string(scopes), dc.Status, dc.UserID,
+		timeStr(dc.ExpiresAt), dc.Interval, timeStr(dc.CreatedAt),
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("sqlite: create device code: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetDeviceCode(ctx context.Context, deviceCode string) (*storage.DeviceCode, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT device_code, user_code, client_id, scopes, status, user_id, expires_at, interval, created_at
+		 FROM device_codes WHERE device_code = ?`, deviceCode)
+	return scanDeviceCode(row)
+}
+
+func (s *Store) GetDeviceCodeByUserCode(ctx context.Context, userCode string) (*storage.DeviceCode, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT device_code, user_code, client_id, scopes, status, user_id, expires_at, interval, created_at
+		 FROM device_codes WHERE user_code = ?`, userCode)
+	return scanDeviceCode(row)
+}
+
+func (s *Store) UpdateDeviceCodeStatus(ctx context.Context, deviceCode, status, userID string) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE device_codes SET status = ?, user_id = ? WHERE device_code = ?`,
+		status, userID, deviceCode)
+	if err != nil {
+		return fmt.Errorf("sqlite: update device code status: %w", err)
+	}
+	return checkRowsAffected(res, "device_code")
+}
+
+func (s *Store) DeleteDeviceCode(ctx context.Context, deviceCode string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM device_codes WHERE device_code = ?`, deviceCode)
+	if err != nil {
+		return fmt.Errorf("sqlite: delete device code: %w", err)
+	}
+	return checkRowsAffected(res, "device_code")
+}
+
+func (s *Store) DeleteExpiredDeviceCodes(ctx context.Context) (int64, error) {
+	now := timeStr(time.Now().UTC())
+	res, err := s.db.ExecContext(ctx,
+		`DELETE FROM device_codes WHERE expires_at < ?`, now)
+	if err != nil {
+		return 0, fmt.Errorf("sqlite: delete expired device codes: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
+}
+
+func scanDeviceCode(row scanner) (*storage.DeviceCode, error) {
+	var dc storage.DeviceCode
+	var scopes string
+	var expiresAt, createdAt string
+	var userID sql.NullString
+	err := row.Scan(&dc.DeviceCode, &dc.UserCode, &dc.ClientID, &scopes, &dc.Status, &userID, &expiresAt, &dc.Interval, &createdAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("sqlite: scan device code: %w", err)
+	}
+	_ = json.Unmarshal([]byte(scopes), &dc.Scopes)
+	dc.ExpiresAt, _ = time.Parse(time.RFC3339, expiresAt)
+	dc.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	if userID.Valid {
+		dc.UserID = userID.String
+	}
+	return &dc, nil
 }

@@ -8,7 +8,7 @@
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: #f5f5f5;
+            background: {{if .Branding.BackgroundColor}}{{.Branding.BackgroundColor}}{{else}}#f5f5f5{{end}};
             color: #333;
             display: flex;
             justify-content: center;
@@ -35,6 +35,14 @@
             color: #666;
             font-size: 0.875rem;
             margin-bottom: 1.5rem;
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        .logo img {
+            max-height: 48px;
+            max-width: 200px;
         }
         .error {
             background: #fef2f2;
@@ -66,7 +74,7 @@
             margin-bottom: 0.25rem;
             color: #555;
         }
-        input[type="email"], input[type="password"] {
+        input[type="text"], input[type="email"], input[type="password"] {
             width: 100%;
             padding: 0.625rem 0.75rem;
             border: 1px solid #d1d5db;
@@ -76,8 +84,8 @@
             outline: none;
             transition: border-color 0.15s;
         }
-        input[type="email"]:focus, input[type="password"]:focus {
-            border-color: #2563eb;
+        input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus {
+            border-color: {{if .Branding.PrimaryColor}}{{.Branding.PrimaryColor}}{{else}}#2563eb{{end}};
             box-shadow: 0 0 0 2px rgba(37,99,235,0.15);
         }
         .btn {
@@ -95,10 +103,10 @@
             transition: background 0.15s;
         }
         .btn-primary {
-            background: #2563eb;
+            background: {{if .Branding.PrimaryColor}}{{.Branding.PrimaryColor}}{{else}}#2563eb{{end}};
             color: #fff;
         }
-        .btn-primary:hover { background: #1d4ed8; }
+        .btn-primary:hover { opacity: 0.9; }
         .btn-secondary {
             background: #f3f4f6;
             color: #333;
@@ -118,10 +126,14 @@
             color: #999;
             font-size: 0.75rem;
         }
+        {{if .Branding.CustomCSS}}{{.Branding.CustomCSS}}{{end}}
     </style>
 </head>
 <body>
     <div class="card">
+        {{if .Branding.LogoURL}}
+        <div class="logo"><img src="{{.Branding.LogoURL}}" alt="Logo"></div>
+        {{end}}
         <h1>Sign In</h1>
         <div class="subtitle">{{.Issuer}}</div>
 
@@ -163,6 +175,48 @@
             </form>
         </div>
         {{end}}
+        {{end}}
+
+        {{if .MagicLinkEnabled}}
+        <div class="divider">or sign in with email</div>
+        <div class="section" id="magiclink-section">
+            <form id="magiclink-request-form" method="POST" action="/authn/magiclink/request">
+                {{range $k, $v := .OIDCParams}}
+                <input type="hidden" name="{{$k}}" value="{{$v}}">
+                {{end}}
+                <label for="magiclink-email">Email</label>
+                <input type="email" id="magiclink-email" name="email" required autocomplete="email" placeholder="you@example.com">
+                <button type="submit" class="btn btn-secondary">Send code</button>
+            </form>
+            <form id="magiclink-verify-form" method="POST" action="/authn/magiclink/verify" style="display:none;">
+                {{range $k, $v := .OIDCParams}}
+                <input type="hidden" name="{{$k}}" value="{{$v}}">
+                {{end}}
+                <input type="hidden" id="magiclink-verify-email" name="email" value="">
+                <label for="magiclink-code">Enter the 6-digit code sent to your email</label>
+                <input type="text" id="magiclink-code" name="code" required autocomplete="one-time-code" placeholder="123456" maxlength="6" pattern="[0-9]{6}" inputmode="numeric">
+                <button type="submit" class="btn btn-primary">Verify code</button>
+            </form>
+        </div>
+        <script>
+        (function() {
+            var reqForm = document.getElementById('magiclink-request-form');
+            var verForm = document.getElementById('magiclink-verify-form');
+            reqForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                var email = document.getElementById('magiclink-email').value;
+                fetch(reqForm.action, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email: email})
+                }).then(function() {
+                    document.getElementById('magiclink-verify-email').value = email;
+                    reqForm.style.display = 'none';
+                    verForm.style.display = 'block';
+                });
+            });
+        })();
+        </script>
         {{end}}
 
         {{if .PasswordEnabled}}

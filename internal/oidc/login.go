@@ -9,18 +9,21 @@ import (
 	"strings"
 
 	"github.com/Monet/seki/internal/config"
+	"github.com/Monet/seki/internal/storage"
 	"github.com/Monet/seki/web/login"
 )
 
 // loginPageData holds the template data for the login page.
 type loginPageData struct {
-	Issuer          string
-	Error           string
-	PasskeyEnabled  bool
-	TOTPEnabled     bool
-	PasswordEnabled bool
-	SocialProviders map[string]config.SocialProvider
-	OIDCParams      map[string]string
+	Issuer           string
+	Error            string
+	PasskeyEnabled   bool
+	TOTPEnabled      bool
+	PasswordEnabled  bool
+	MagicLinkEnabled bool
+	SocialProviders  map[string]config.SocialProvider
+	OIDCParams       map[string]string
+	Branding         storage.OrgBranding
 }
 
 // oidcParamKeys are the OIDC authorization parameters to preserve through the login flow.
@@ -42,6 +45,14 @@ var loginTemplate = template.Must(
 // handleLoginPage renders the login page (GET /login).
 func (p *Provider) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	data := p.buildLoginData(r.URL.Query(), "")
+
+	// Load org branding if ?org= is present.
+	if orgSlug := r.URL.Query().Get("org"); orgSlug != "" {
+		if org, err := p.store.GetOrgBySlug(r.Context(), orgSlug); err == nil {
+			data.Branding = org.Branding
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := loginTemplate.Execute(w, data); err != nil {
 		http.Error(w, "failed to render login page", http.StatusInternalServerError)
@@ -225,13 +236,14 @@ func (p *Provider) buildLoginData(query url.Values, errMsg string) loginPageData
 	}
 
 	return loginPageData{
-		Issuer:          p.issuer,
-		Error:           errMsg,
-		PasskeyEnabled:  p.authnConfig.Passkey.Enabled,
-		TOTPEnabled:     p.authnConfig.TOTP.Enabled,
-		PasswordEnabled: p.authnConfig.Password.Enabled,
-		SocialProviders: p.authnConfig.Social,
-		OIDCParams:      params,
+		Issuer:           p.issuer,
+		Error:            errMsg,
+		PasskeyEnabled:   p.authnConfig.Passkey.Enabled,
+		TOTPEnabled:      p.authnConfig.TOTP.Enabled,
+		PasswordEnabled:  p.authnConfig.Password.Enabled,
+		MagicLinkEnabled: p.authnConfig.MagicLink.Enabled,
+		SocialProviders:  p.authnConfig.Social,
+		OIDCParams:       params,
 	}
 }
 

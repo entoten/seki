@@ -120,6 +120,31 @@ type Credential struct {
 	UpdatedAt       time.Time       `json:"updated_at"`
 }
 
+// PersonalAccessToken represents a personal access token issued to a user.
+type PersonalAccessToken struct {
+	ID         string     `json:"id"`
+	UserID     string     `json:"user_id"`
+	Name       string     `json:"name"`
+	TokenHash  string     `json:"-"`
+	Scopes     []string   `json:"scopes"`
+	ExpiresAt  time.Time  `json:"expires_at"`
+	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+}
+
+// DeviceCode represents a device authorization grant code.
+type DeviceCode struct {
+	DeviceCode string    `json:"device_code"`
+	UserCode   string    `json:"user_code"`
+	ClientID   string    `json:"client_id"`
+	Scopes     []string  `json:"scopes"`
+	Status     string    `json:"status"` // pending, approved, denied, expired
+	UserID     string    `json:"user_id,omitempty"`
+	ExpiresAt  time.Time `json:"expires_at"`
+	Interval   int       `json:"interval"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
 // AuditListOptions controls cursor-based pagination and filtering for audit logs.
 type AuditListOptions struct {
 	Cursor  string // opaque cursor (audit entry ID for keyset pagination)
@@ -130,12 +155,29 @@ type AuditListOptions struct {
 	To      time.Time // optional: only entries created before this time
 }
 
+// OrgBranding holds custom branding settings for an organization's login page.
+type OrgBranding struct {
+	LogoURL         string `json:"logo_url"`
+	PrimaryColor    string `json:"primary_color"`
+	BackgroundColor string `json:"background_color"`
+	CustomCSS       string `json:"custom_css"`
+}
+
+// DefaultOrgBranding returns the default branding settings.
+func DefaultOrgBranding() OrgBranding {
+	return OrgBranding{
+		PrimaryColor:    "#0066cc",
+		BackgroundColor: "#ffffff",
+	}
+}
+
 // Organization represents a tenant/organization.
 type Organization struct {
 	ID        string          `json:"id"`
 	Slug      string          `json:"slug"`
 	Name      string          `json:"name"`
 	Domains   []string        `json:"domains"`
+	Branding  OrgBranding     `json:"branding"`
 	Metadata  json.RawMessage `json:"metadata"`
 	CreatedAt time.Time       `json:"created_at"`
 	UpdatedAt time.Time       `json:"updated_at"`

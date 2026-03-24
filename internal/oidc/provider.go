@@ -69,4 +69,7 @@ func (p *Provider) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /login", p.handleLoginPage)
 	mux.HandleFunc("POST /login", p.handleLoginSubmit)
 	mux.HandleFunc("POST /logout", p.handleLogout)
+
+	// Device authorization grant (RFC 8628).
+	p.RegisterDeviceRoutes(mux)
 }

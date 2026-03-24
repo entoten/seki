@@ -36,6 +36,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	h.registerAuditRoutesOn(api)
 	h.registerSessionRoutesOn(api)
 	h.registerClientRoutesOn(api)
+	h.registerPATRoutesOn(api)
+	h.registerBrandingRoutesOn(api)
+	h.registerMAURoutesOn(api)
 
 	// Wrap with authentication + body size limit and mount on the outer mux.
 	authMiddleware := RequireAPIKey(h.apiKeys)

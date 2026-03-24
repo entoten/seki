@@ -100,10 +100,25 @@ type RoleConfig struct {
 
 // AuthenticationConfig holds authentication method settings.
 type AuthenticationConfig struct {
-	Passkey  PasskeyConfig             `yaml:"passkey"`
-	TOTP     TOTPConfig                `yaml:"totp"`
-	Password PasswordConfig            `yaml:"password"`
-	Social   map[string]SocialProvider `yaml:"social"`
+	Passkey   PasskeyConfig             `yaml:"passkey"`
+	TOTP      TOTPConfig                `yaml:"totp"`
+	Password  PasswordConfig            `yaml:"password"`
+	MagicLink MagicLinkConfig           `yaml:"magic_link"`
+	Social    map[string]SocialProvider `yaml:"social"`
+	JIT       JITConfig                 `yaml:"jit"`
+}
+
+// JITConfig holds Just-In-Time provisioning settings.
+type JITConfig struct {
+	Enabled     bool   `yaml:"enabled"`
+	DefaultRole string `yaml:"default_role"` // default "member"
+}
+
+// MagicLinkConfig holds magic link / email OTP authentication settings.
+type MagicLinkConfig struct {
+	Enabled    bool   `yaml:"enabled"`
+	CodeLength int    `yaml:"code_length"` // default 6
+	TTL        string `yaml:"ttl"`         // default "10m"
 }
 
 // PasskeyConfig holds WebAuthn/Passkey settings.

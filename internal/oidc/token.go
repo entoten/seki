@@ -39,8 +39,10 @@ func (p *Provider) handleToken(w http.ResponseWriter, r *http.Request) {
 		p.handleClientCredentialsGrant(w, r)
 	case "refresh_token":
 		p.handleRefreshTokenGrant(w, r)
+	case "urn:ietf:params:oauth:grant-type:device_code":
+		p.handleDeviceCodeGrant(w, r)
 	default:
-		tokenError(w, http.StatusBadRequest, "unsupported_grant_type", "grant_type must be authorization_code, client_credentials, or refresh_token")
+		tokenError(w, http.StatusBadRequest, "unsupported_grant_type", "unsupported grant_type")
 	}
 }
 

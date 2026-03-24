@@ -109,8 +109,8 @@ func TestEmitEventFiltering(t *testing.T) {
 		},
 	})
 
-	e.Emit(context.Background(), "user.login", nil)    // should match
-	e.Emit(context.Background(), "user.created", nil)   // should NOT match
+	e.Emit(context.Background(), "user.login", nil)   // should match
+	e.Emit(context.Background(), "user.created", nil) // should NOT match
 	time.Sleep(300 * time.Millisecond)
 
 	mu.Lock()

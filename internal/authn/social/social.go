@@ -62,11 +62,17 @@ type SocialUser struct {
 	AvatarURL  string `json:"avatar_url"`
 }
 
+// JITProvisioner is an interface for Just-In-Time user provisioning.
+type JITProvisioner interface {
+	ProvisionUser(ctx context.Context, user *storage.User, source string) (*storage.Organization, error)
+}
+
 // Service provides social login functionality.
 type Service struct {
 	providers map[string]*Provider
 	store     storage.Storage
 	client    *http.Client
+	jit       JITProvisioner
 }
 
 // NewService creates a new social login service from configuration.
@@ -95,6 +101,11 @@ func NewService(cfg map[string]config.SocialProvider, store storage.Storage) *Se
 		store:     store,
 		client:    &http.Client{Timeout: 10 * time.Second},
 	}
+}
+
+// SetJITProvisioner sets the JIT provisioner on the service.
+func (s *Service) SetJITProvisioner(jit JITProvisioner) {
+	s.jit = jit
 }
 
 // GetProvider returns the provider by name, or an error if not found.
@@ -183,6 +194,8 @@ func (s *Service) LinkAccount(ctx context.Context, socialUser *SocialUser, exist
 
 // FindOrCreateUser finds a user by email or creates a new one.
 // Returns the user and a boolean indicating whether the user was newly created.
+// If a new user is created and JIT provisioning is enabled, the user is
+// automatically matched to an organization based on their email domain.
 func (s *Service) FindOrCreateUser(ctx context.Context, socialUser *SocialUser) (*storage.User, bool, error) {
 	// Try to find existing user by email.
 	user, err := s.store.GetUserByEmail(ctx, socialUser.Email)
@@ -206,6 +219,14 @@ func (s *Service) FindOrCreateUser(ctx context.Context, socialUser *SocialUser) 
 
 	if err := s.store.CreateUser(ctx, user); err != nil {
 		return nil, false, fmt.Errorf("social: create user: %w", err)
+	}
+
+	// JIT provisioning: match org by email domain and add as member.
+	if s.jit != nil {
+		if _, err := s.jit.ProvisionUser(ctx, user, "social:"+socialUser.Provider); err != nil {
+			// JIT provisioning failure is non-fatal — user is still created.
+			_ = err
+		}
 	}
 
 	return user, true, nil

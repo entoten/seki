@@ -67,6 +67,9 @@ func (s *Store) Migrate() error {
 		"migrations/004_credentials_webauthn.up.sql",
 		"migrations/005_organizations.up.sql",
 		"migrations/006_verification_tokens.up.sql",
+		"migrations/007_personal_access_tokens.up.sql",
+		"migrations/008_device_codes.up.sql",
+		"migrations/009_org_branding.up.sql",
 	}
 	for _, name := range migrations {
 		data, err := migrationsFS.ReadFile(name)
@@ -455,6 +458,33 @@ func (s *Store) ListAuditLogs(ctx context.Context, opts storage.AuditListOptions
 	return entries, nextCursor, nil
 }
 
+func (s *Store) CountDistinctActors(ctx context.Context, action string, from, to time.Time) (int, error) {
+	var count int
+	err := s.pool.QueryRow(ctx,
+		`SELECT COUNT(DISTINCT actor_id) FROM audit_logs
+		 WHERE action = $1 AND created_at >= $2 AND created_at < $3`,
+		action, from.UTC(), to.UTC(),
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("postgres: count distinct actors: %w", err)
+	}
+	return count, nil
+}
+
+func (s *Store) CountDistinctActorsByOrg(ctx context.Context, action string, from, to time.Time, orgID string) (int, error) {
+	var count int
+	err := s.pool.QueryRow(ctx,
+		`SELECT COUNT(DISTINCT a.actor_id) FROM audit_logs a
+		 INNER JOIN org_members m ON a.actor_id = m.user_id AND m.org_id = $1
+		 WHERE a.action = $2 AND a.created_at >= $3 AND a.created_at < $4`,
+		orgID, action, from.UTC(), to.UTC(),
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("postgres: count distinct actors by org: %w", err)
+	}
+	return count, nil
+}
+
 // ---------------------------------------------------------------------------
 // AuthCodeStore
 // ---------------------------------------------------------------------------
@@ -703,12 +733,13 @@ func (s *Store) DeleteCredentialsByUserAndType(ctx context.Context, userID strin
 
 func (s *Store) CreateOrg(ctx context.Context, org *storage.Organization) error {
 	domains, _ := json.Marshal(org.Domains)
+	branding, _ := json.Marshal(org.Branding)
 	meta := normalizeJSON(org.Metadata)
 	now := org.CreatedAt.UTC()
 	_, err := s.pool.Exec(ctx,
-		`INSERT INTO organizations (id, slug, name, domains, metadata, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		org.ID, org.Slug, org.Name, string(domains), meta, now, now,
+		`INSERT INTO organizations (id, slug, name, domains, branding, metadata, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		org.ID, org.Slug, org.Name, string(domains), string(branding), meta, now, now,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -721,26 +752,34 @@ func (s *Store) CreateOrg(ctx context.Context, org *storage.Organization) error 
 
 func (s *Store) GetOrg(ctx context.Context, id string) (*storage.Organization, error) {
 	row := s.pool.QueryRow(ctx,
-		`SELECT id, slug, name, domains, metadata, created_at, updated_at
+		`SELECT id, slug, name, domains, branding, metadata, created_at, updated_at
 		 FROM organizations WHERE id = $1`, id)
 	return scanOrgPgx(row)
 }
 
 func (s *Store) GetOrgBySlug(ctx context.Context, slug string) (*storage.Organization, error) {
 	row := s.pool.QueryRow(ctx,
-		`SELECT id, slug, name, domains, metadata, created_at, updated_at
+		`SELECT id, slug, name, domains, branding, metadata, created_at, updated_at
 		 FROM organizations WHERE slug = $1`, slug)
+	return scanOrgPgx(row)
+}
+
+func (s *Store) GetOrgByDomain(ctx context.Context, domain string) (*storage.Organization, error) {
+	row := s.pool.QueryRow(ctx,
+		`SELECT id, slug, name, domains, branding, metadata, created_at, updated_at
+		 FROM organizations WHERE domains @> $1::jsonb`, `["`+domain+`"]`)
 	return scanOrgPgx(row)
 }
 
 func (s *Store) UpdateOrg(ctx context.Context, org *storage.Organization) error {
 	domains, _ := json.Marshal(org.Domains)
+	branding, _ := json.Marshal(org.Branding)
 	meta := normalizeJSON(org.Metadata)
 	now := time.Now().UTC()
 	ct, err := s.pool.Exec(ctx,
-		`UPDATE organizations SET slug = $1, name = $2, domains = $3, metadata = $4, updated_at = $5
-		 WHERE id = $6`,
-		org.Slug, org.Name, string(domains), meta, now, org.ID,
+		`UPDATE organizations SET slug = $1, name = $2, domains = $3, branding = $4, metadata = $5, updated_at = $6
+		 WHERE id = $7`,
+		org.Slug, org.Name, string(domains), string(branding), meta, now, org.ID,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -774,13 +813,13 @@ func (s *Store) ListOrgs(ctx context.Context, opts storage.ListOptions) ([]*stor
 	var err error
 	if opts.Cursor != "" {
 		rows, err = s.pool.Query(ctx,
-			`SELECT id, slug, name, domains, metadata, created_at, updated_at
+			`SELECT id, slug, name, domains, branding, metadata, created_at, updated_at
 			 FROM organizations WHERE id > $1 ORDER BY id ASC LIMIT $2`,
 			opts.Cursor, limit+1,
 		)
 	} else {
 		rows, err = s.pool.Query(ctx,
-			`SELECT id, slug, name, domains, metadata, created_at, updated_at
+			`SELECT id, slug, name, domains, branding, metadata, created_at, updated_at
 			 FROM organizations ORDER BY id ASC LIMIT $1`,
 			limit+1,
 		)
@@ -976,8 +1015,8 @@ func (s *Store) DeleteRole(ctx context.Context, id string) error {
 
 func scanOrgPgx(row pgx.Row) (*storage.Organization, error) {
 	var o storage.Organization
-	var domains, meta []byte
-	err := row.Scan(&o.ID, &o.Slug, &o.Name, &domains, &meta, &o.CreatedAt, &o.UpdatedAt)
+	var domains, branding, meta []byte
+	err := row.Scan(&o.ID, &o.Slug, &o.Name, &domains, &branding, &meta, &o.CreatedAt, &o.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, storage.ErrNotFound
@@ -985,18 +1024,20 @@ func scanOrgPgx(row pgx.Row) (*storage.Organization, error) {
 		return nil, fmt.Errorf("postgres: scan org: %w", err)
 	}
 	_ = json.Unmarshal(domains, &o.Domains)
+	_ = json.Unmarshal(branding, &o.Branding)
 	o.Metadata = json.RawMessage(meta)
 	return &o, nil
 }
 
 func scanOrgPgxRows(rows pgx.Rows) (*storage.Organization, error) {
 	var o storage.Organization
-	var domains, meta []byte
-	err := rows.Scan(&o.ID, &o.Slug, &o.Name, &domains, &meta, &o.CreatedAt, &o.UpdatedAt)
+	var domains, branding, meta []byte
+	err := rows.Scan(&o.ID, &o.Slug, &o.Name, &domains, &branding, &meta, &o.CreatedAt, &o.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: scan org: %w", err)
 	}
 	_ = json.Unmarshal(domains, &o.Domains)
+	_ = json.Unmarshal(branding, &o.Branding)
 	o.Metadata = json.RawMessage(meta)
 	return &o, nil
 }
@@ -1160,4 +1201,178 @@ func (s *Store) DeleteExpiredTokens(ctx context.Context) (int64, error) {
 		return 0, fmt.Errorf("postgres: delete expired tokens: %w", err)
 	}
 	return ct.RowsAffected(), nil
+}
+
+// ---------------------------------------------------------------------------
+// PATStore
+// ---------------------------------------------------------------------------
+
+func (s *Store) CreatePAT(ctx context.Context, pat *storage.PersonalAccessToken) error {
+	scopes, _ := json.Marshal(pat.Scopes)
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO personal_access_tokens (id, user_id, name, token_hash, scopes, expires_at, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		pat.ID, pat.UserID, pat.Name, pat.TokenHash,
+		string(scopes), pat.ExpiresAt, pat.CreatedAt,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("postgres: create pat: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetPATByHash(ctx context.Context, hash string) (*storage.PersonalAccessToken, error) {
+	row := s.pool.QueryRow(ctx,
+		`SELECT id, user_id, name, token_hash, scopes, expires_at, last_used_at, created_at
+		 FROM personal_access_tokens WHERE token_hash = $1`, hash)
+	var p storage.PersonalAccessToken
+	var scopes string
+	var lastUsedAt *time.Time
+	err := row.Scan(&p.ID, &p.UserID, &p.Name, &p.TokenHash, &scopes, &p.ExpiresAt, &lastUsedAt, &p.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("postgres: scan pat: %w", err)
+	}
+	_ = json.Unmarshal([]byte(scopes), &p.Scopes)
+	p.LastUsedAt = lastUsedAt
+	return &p, nil
+}
+
+func (s *Store) ListPATsByUser(ctx context.Context, userID string) ([]*storage.PersonalAccessToken, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT id, user_id, name, token_hash, scopes, expires_at, last_used_at, created_at
+		 FROM personal_access_tokens WHERE user_id = $1 ORDER BY created_at DESC`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: list pats: %w", err)
+	}
+	defer rows.Close()
+
+	var pats []*storage.PersonalAccessToken
+	for rows.Next() {
+		var p storage.PersonalAccessToken
+		var scopes string
+		var lastUsedAt *time.Time
+		err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.TokenHash, &scopes, &p.ExpiresAt, &lastUsedAt, &p.CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("postgres: scan pat: %w", err)
+		}
+		_ = json.Unmarshal([]byte(scopes), &p.Scopes)
+		p.LastUsedAt = lastUsedAt
+		pats = append(pats, &p)
+	}
+	return pats, rows.Err()
+}
+
+func (s *Store) DeletePAT(ctx context.Context, id string) error {
+	ct, err := s.pool.Exec(ctx, `DELETE FROM personal_access_tokens WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("postgres: delete pat: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) UpdatePATLastUsed(ctx context.Context, id string, lastUsed time.Time) error {
+	_, err := s.pool.Exec(ctx,
+		`UPDATE personal_access_tokens SET last_used_at = $1 WHERE id = $2`,
+		lastUsed, id)
+	if err != nil {
+		return fmt.Errorf("postgres: update pat last_used: %w", err)
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// DeviceCodeStore
+// ---------------------------------------------------------------------------
+
+func (s *Store) CreateDeviceCode(ctx context.Context, dc *storage.DeviceCode) error {
+	scopes, _ := json.Marshal(dc.Scopes)
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO device_codes (device_code, user_code, client_id, scopes, status, user_id, expires_at, interval, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		dc.DeviceCode, dc.UserCode, dc.ClientID,
+		string(scopes), dc.Status, dc.UserID,
+		dc.ExpiresAt, dc.Interval, dc.CreatedAt,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("postgres: create device code: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetDeviceCode(ctx context.Context, deviceCode string) (*storage.DeviceCode, error) {
+	row := s.pool.QueryRow(ctx,
+		`SELECT device_code, user_code, client_id, scopes, status, user_id, expires_at, interval, created_at
+		 FROM device_codes WHERE device_code = $1`, deviceCode)
+	return s.scanDeviceCode(row)
+}
+
+func (s *Store) GetDeviceCodeByUserCode(ctx context.Context, userCode string) (*storage.DeviceCode, error) {
+	row := s.pool.QueryRow(ctx,
+		`SELECT device_code, user_code, client_id, scopes, status, user_id, expires_at, interval, created_at
+		 FROM device_codes WHERE user_code = $1`, userCode)
+	return s.scanDeviceCode(row)
+}
+
+func (s *Store) UpdateDeviceCodeStatus(ctx context.Context, deviceCode, status, userID string) error {
+	ct, err := s.pool.Exec(ctx,
+		`UPDATE device_codes SET status = $1, user_id = $2 WHERE device_code = $3`,
+		status, userID, deviceCode)
+	if err != nil {
+		return fmt.Errorf("postgres: update device code status: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DeleteDeviceCode(ctx context.Context, deviceCode string) error {
+	ct, err := s.pool.Exec(ctx, `DELETE FROM device_codes WHERE device_code = $1`, deviceCode)
+	if err != nil {
+		return fmt.Errorf("postgres: delete device code: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DeleteExpiredDeviceCodes(ctx context.Context) (int64, error) {
+	now := time.Now().UTC()
+	ct, err := s.pool.Exec(ctx,
+		`DELETE FROM device_codes WHERE expires_at < $1`, now)
+	if err != nil {
+		return 0, fmt.Errorf("postgres: delete expired device codes: %w", err)
+	}
+	return ct.RowsAffected(), nil
+}
+
+func (s *Store) scanDeviceCode(row pgx.Row) (*storage.DeviceCode, error) {
+	var dc storage.DeviceCode
+	var scopes string
+	var userID *string
+	err := row.Scan(&dc.DeviceCode, &dc.UserCode, &dc.ClientID, &scopes, &dc.Status, &userID, &dc.ExpiresAt, &dc.Interval, &dc.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("postgres: scan device code: %w", err)
+	}
+	_ = json.Unmarshal([]byte(scopes), &dc.Scopes)
+	if userID != nil {
+		dc.UserID = *userID
+	}
+	return &dc, nil
 }

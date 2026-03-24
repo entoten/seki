@@ -24,6 +24,8 @@ type Storage interface {
 	OrgStore
 	RoleStore
 	VerificationTokenStore
+	PATStore
+	DeviceCodeStore
 	Migrate() error
 	Close() error
 	Ping(ctx context.Context) error
@@ -63,6 +65,8 @@ type SessionStore interface {
 type AuditStore interface {
 	CreateAuditLog(ctx context.Context, entry *AuditEntry) error
 	ListAuditLogs(ctx context.Context, opts AuditListOptions) ([]*AuditEntry, string, error)
+	CountDistinctActors(ctx context.Context, action string, from, to time.Time) (int, error)
+	CountDistinctActorsByOrg(ctx context.Context, action string, from, to time.Time, orgID string) (int, error)
 }
 
 // AuthCodeStore defines operations on OAuth2 authorization codes.
@@ -99,6 +103,7 @@ type OrgStore interface {
 	CreateOrg(ctx context.Context, org *Organization) error
 	GetOrg(ctx context.Context, id string) (*Organization, error)
 	GetOrgBySlug(ctx context.Context, slug string) (*Organization, error)
+	GetOrgByDomain(ctx context.Context, domain string) (*Organization, error)
 	UpdateOrg(ctx context.Context, org *Organization) error
 	DeleteOrg(ctx context.Context, id string) error
 	ListOrgs(ctx context.Context, opts ListOptions) ([]*Organization, string, error)
@@ -126,4 +131,23 @@ type VerificationTokenStore interface {
 	GetVerificationTokenByHash(ctx context.Context, hash string) (*VerificationToken, error)
 	MarkTokenUsed(ctx context.Context, id string) error
 	DeleteExpiredTokens(ctx context.Context) (int64, error)
+}
+
+// PATStore defines operations on personal access tokens.
+type PATStore interface {
+	CreatePAT(ctx context.Context, pat *PersonalAccessToken) error
+	GetPATByHash(ctx context.Context, hash string) (*PersonalAccessToken, error)
+	ListPATsByUser(ctx context.Context, userID string) ([]*PersonalAccessToken, error)
+	DeletePAT(ctx context.Context, id string) error
+	UpdatePATLastUsed(ctx context.Context, id string, lastUsed time.Time) error
+}
+
+// DeviceCodeStore defines operations on device authorization codes.
+type DeviceCodeStore interface {
+	CreateDeviceCode(ctx context.Context, dc *DeviceCode) error
+	GetDeviceCode(ctx context.Context, deviceCode string) (*DeviceCode, error)
+	GetDeviceCodeByUserCode(ctx context.Context, userCode string) (*DeviceCode, error)
+	UpdateDeviceCodeStatus(ctx context.Context, deviceCode, status, userID string) error
+	DeleteDeviceCode(ctx context.Context, deviceCode string) error
+	DeleteExpiredDeviceCodes(ctx context.Context) (int64, error)
 }
