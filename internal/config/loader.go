@@ -22,7 +22,7 @@ func Load(path string) (*Config, error) {
 		path = DefaultPath
 	}
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- intentional: file path from user CLI argument
 	if err != nil {
 		return nil, fmt.Errorf("reading config file: %w", err)
 	}

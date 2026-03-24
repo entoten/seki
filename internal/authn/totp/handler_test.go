@@ -9,10 +9,11 @@ import (
 	"testing"
 	"time"
 
+	totpLib "github.com/pquerna/otp/totp"
+
 	"github.com/Monet/seki/internal/config"
 	"github.com/Monet/seki/internal/storage"
 	"github.com/Monet/seki/internal/storage/sqlite"
-	totpLib "github.com/pquerna/otp/totp"
 )
 
 func setupHandlerTest(t *testing.T) (*Handler, *Service, storage.Storage, *storage.User) {
@@ -57,7 +58,7 @@ func TestHandler_SetupBegin(t *testing.T) {
 	}
 
 	var resp map[string]interface{}
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	if resp["otpauth_uri"] == nil || resp["otpauth_uri"] == "" {
 		t.Error("missing otpauth_uri")
 	}

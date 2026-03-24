@@ -17,7 +17,7 @@ type ProblemDetail struct {
 func writeProblem(w http.ResponseWriter, status int, detail string) {
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(ProblemDetail{
+	_ = json.NewEncoder(w).Encode(ProblemDetail{
 		Type:   "about:blank",
 		Title:  http.StatusText(status),
 		Status: status,

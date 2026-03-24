@@ -8,8 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Monet/seki/internal/storage"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/Monet/seki/internal/storage"
 )
 
 // generateAccessToken creates a signed JWT access token.

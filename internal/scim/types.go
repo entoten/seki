@@ -86,8 +86,8 @@ type SCIMError struct {
 
 // SCIMPatchRequest represents a SCIM PATCH request body (RFC 7644 section 3.5.2).
 type SCIMPatchRequest struct {
-	Schemas    []string        `json:"schemas"`
-	Operations []SCIMPatchOp   `json:"Operations"`
+	Schemas    []string      `json:"schemas"`
+	Operations []SCIMPatchOp `json:"Operations"`
 }
 
 // SCIMPatchOp is a single SCIM PATCH operation.

@@ -19,7 +19,7 @@ func (p *Provider) handleUserInfo(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"error":             "invalid_token",
 			"error_description": "token validation failed",
 		})
@@ -31,7 +31,7 @@ func (p *Provider) handleUserInfo(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"error":             "invalid_token",
 			"error_description": "missing sub claim",
 		})
@@ -43,7 +43,7 @@ func (p *Provider) handleUserInfo(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, storage.ErrNotFound) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]string{
+			_ = json.NewEncoder(w).Encode(map[string]string{
 				"error":             "not_found",
 				"error_description": "user not found",
 			})
@@ -51,7 +51,7 @@ func (p *Provider) handleUserInfo(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"error":             "server_error",
 			"error_description": "failed to retrieve user",
 		})
@@ -86,7 +86,7 @@ func (p *Provider) handleUserInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // validateAccessToken extracts and validates a Bearer token from the

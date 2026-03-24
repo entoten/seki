@@ -24,7 +24,7 @@ func TestPatchGroupRenameAndMembers(t *testing.T) {
 		t.Fatalf("create user: expected 201, got %d", rec.Code)
 	}
 	var user scim.SCIMUser
-	json.NewDecoder(rec.Body).Decode(&user)
+	_ = json.NewDecoder(rec.Body).Decode(&user)
 
 	// Create group.
 	body := `{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"displayName":"Original Name"}`
@@ -35,7 +35,7 @@ func TestPatchGroupRenameAndMembers(t *testing.T) {
 		t.Fatalf("create group: expected 201, got %d: %s", rec.Code, rec.Body.String())
 	}
 	var created scim.SCIMGroup
-	json.NewDecoder(rec.Body).Decode(&created)
+	_ = json.NewDecoder(rec.Body).Decode(&created)
 
 	// Patch: rename group.
 	patchBody := `{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[{"op":"replace","path":"displayName","value":"New Name"}]}`
@@ -47,7 +47,7 @@ func TestPatchGroupRenameAndMembers(t *testing.T) {
 	}
 
 	var patched scim.SCIMGroup
-	json.NewDecoder(rec.Body).Decode(&patched)
+	_ = json.NewDecoder(rec.Body).Decode(&patched)
 	if patched.DisplayName != "New Name" {
 		t.Errorf("displayName = %q, want New Name", patched.DisplayName)
 	}
@@ -62,7 +62,7 @@ func TestPatchGroupRenameAndMembers(t *testing.T) {
 	}
 
 	var withMember scim.SCIMGroup
-	json.NewDecoder(rec.Body).Decode(&withMember)
+	_ = json.NewDecoder(rec.Body).Decode(&withMember)
 	if len(withMember.Members) != 1 {
 		t.Fatalf("expected 1 member, got %d", len(withMember.Members))
 	}
@@ -77,7 +77,7 @@ func TestPatchGroupRenameAndMembers(t *testing.T) {
 	}
 
 	var afterRemove scim.SCIMGroup
-	json.NewDecoder(rec.Body).Decode(&afterRemove)
+	_ = json.NewDecoder(rec.Body).Decode(&afterRemove)
 	if len(afterRemove.Members) != 0 {
 		t.Fatalf("expected 0 members after remove, got %d", len(afterRemove.Members))
 	}
@@ -126,7 +126,7 @@ func TestCreateGroupWithInitialMembers(t *testing.T) {
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	var u scim.SCIMUser
-	json.NewDecoder(rec.Body).Decode(&u)
+	_ = json.NewDecoder(rec.Body).Decode(&u)
 
 	// Create group with initial members.
 	body := `{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"displayName":"With Members","members":[{"value":"` + u.ID + `"}]}`
@@ -139,7 +139,7 @@ func TestCreateGroupWithInitialMembers(t *testing.T) {
 	}
 
 	var g scim.SCIMGroup
-	json.NewDecoder(rec.Body).Decode(&g)
+	_ = json.NewDecoder(rec.Body).Decode(&g)
 	if len(g.Members) != 1 {
 		t.Fatalf("expected 1 member, got %d", len(g.Members))
 	}
@@ -181,7 +181,7 @@ func TestPatchUserNameParts(t *testing.T) {
 		t.Fatalf("create: expected 201, got %d", rec.Code)
 	}
 	var created scim.SCIMUser
-	json.NewDecoder(rec.Body).Decode(&created)
+	_ = json.NewDecoder(rec.Body).Decode(&created)
 
 	// Patch given name.
 	patchBody := `{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[{"op":"replace","path":"name.givenName","value":"Jane"}]}`
@@ -193,7 +193,7 @@ func TestPatchUserNameParts(t *testing.T) {
 	}
 
 	var patched scim.SCIMUser
-	json.NewDecoder(rec.Body).Decode(&patched)
+	_ = json.NewDecoder(rec.Body).Decode(&patched)
 	if patched.DisplayName != "Jane Doe" {
 		t.Errorf("displayName = %q, want 'Jane Doe'", patched.DisplayName)
 	}
@@ -207,7 +207,7 @@ func TestPatchUserNameParts(t *testing.T) {
 		t.Fatalf("patch family name: expected 200, got %d", rec.Code)
 	}
 
-	json.NewDecoder(rec.Body).Decode(&patched)
+	_ = json.NewDecoder(rec.Body).Decode(&patched)
 	if patched.DisplayName != "Jane Smith" {
 		t.Errorf("displayName = %q, want 'Jane Smith'", patched.DisplayName)
 	}
@@ -220,7 +220,7 @@ func TestPatchUserNameParts(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("patch no path: expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
-	json.NewDecoder(rec.Body).Decode(&patched)
+	_ = json.NewDecoder(rec.Body).Decode(&patched)
 	if patched.DisplayName != "Direct Update" {
 		t.Errorf("displayName = %q, want 'Direct Update'", patched.DisplayName)
 	}
@@ -235,7 +235,7 @@ func TestPatchUserRemoveDisplayName(t *testing.T) {
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	var created scim.SCIMUser
-	json.NewDecoder(rec.Body).Decode(&created)
+	_ = json.NewDecoder(rec.Body).Decode(&created)
 
 	// Remove displayName.
 	patchBody := `{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[{"op":"remove","path":"displayName"}]}`
@@ -247,7 +247,7 @@ func TestPatchUserRemoveDisplayName(t *testing.T) {
 	}
 
 	var patched scim.SCIMUser
-	json.NewDecoder(rec.Body).Decode(&patched)
+	_ = json.NewDecoder(rec.Body).Decode(&patched)
 	if patched.DisplayName != "" {
 		t.Errorf("displayName = %q, want empty", patched.DisplayName)
 	}
@@ -284,7 +284,7 @@ func TestListUsersWithPagination(t *testing.T) {
 	}
 
 	var resp scim.SCIMListResponse
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	if resp.TotalResults != 3 {
 		t.Errorf("TotalResults = %d, want 3", resp.TotalResults)
 	}
@@ -324,7 +324,7 @@ func TestListUsersContainsFilter(t *testing.T) {
 	}
 
 	var resp scim.SCIMListResponse
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	if resp.TotalResults != 2 {
 		t.Errorf("expected 2 results, got %d", resp.TotalResults)
 	}

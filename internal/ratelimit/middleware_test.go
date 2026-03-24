@@ -65,7 +65,7 @@ func TestHTTPMiddleware_BlocksExcess(t *testing.T) {
 
 	// Check response body.
 	var body map[string]interface{}
-	json.NewDecoder(rec.Body).Decode(&body)
+	_ = json.NewDecoder(rec.Body).Decode(&body)
 	if body["title"] != "Too Many Requests" {
 		t.Errorf("title = %v", body["title"])
 	}

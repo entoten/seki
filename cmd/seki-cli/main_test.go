@@ -87,7 +87,7 @@ func TestUserListWithMockServer(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"users": users,
 		})
 	}))
@@ -122,7 +122,7 @@ func TestUserListJSONOutput(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"users": users,
 		})
 	}))
@@ -192,7 +192,7 @@ func TestGlobalFlagsAPIURL(t *testing.T) {
 			t.Errorf("expected Bearer my-secret, got %s", auth)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"users": []interface{}{},
 		})
 	}))

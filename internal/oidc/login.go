@@ -74,7 +74,7 @@ func (p *Provider) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.Header().Set("Retry-After", "60")
 		w.WriteHeader(http.StatusTooManyRequests)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"type":   "urn:ietf:rfc:6585#too-many-requests",
 			"title":  "Too Many Requests",
 			"status": http.StatusTooManyRequests,

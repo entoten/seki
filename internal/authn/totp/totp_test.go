@@ -5,10 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pquerna/otp/totp"
+
 	"github.com/Monet/seki/internal/config"
 	"github.com/Monet/seki/internal/storage"
 	"github.com/Monet/seki/internal/storage/sqlite"
-	"github.com/pquerna/otp/totp"
 )
 
 func setupTest(t *testing.T) (*Service, storage.Storage, *storage.User) {

@@ -141,7 +141,7 @@ func TestExchange_WithMockServer(t *testing.T) {
 	// Create mock token endpoint.
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"access_token": "mock-access-token",
 			"token_type":   "Bearer",
 		})
@@ -155,7 +155,7 @@ func TestExchange_WithMockServer(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"sub":     "goog-user-123",
 			"email":   "social@example.com",
 			"name":    "Social User",
@@ -201,7 +201,7 @@ func TestExchange_WithMockServer(t *testing.T) {
 func TestExchange_GitHub(t *testing.T) {
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"access_token": "gh-token",
 		})
 	}))
@@ -209,7 +209,7 @@ func TestExchange_GitHub(t *testing.T) {
 
 	userInfoServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"id":         float64(12345),
 			"email":      "ghuser@example.com",
 			"name":       "",
@@ -266,9 +266,9 @@ func TestNewService_IgnoresUnknownProvider(t *testing.T) {
 
 func TestStringFromMap(t *testing.T) {
 	m := map[string]interface{}{
-		"str":  "hello",
-		"num":  42,
-		"nil":  nil,
+		"str": "hello",
+		"num": 42,
+		"nil": nil,
 	}
 	if got := stringFromMap(m, "str"); got != "hello" {
 		t.Errorf("str = %q, want hello", got)

@@ -83,7 +83,7 @@ func TestHandlerCallback_MissingStateCookie(t *testing.T) {
 	}
 
 	var resp map[string]string
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	if resp["error"] != "missing state cookie" {
 		t.Errorf("error = %q", resp["error"])
 	}

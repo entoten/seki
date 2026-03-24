@@ -150,7 +150,7 @@ func TestAuth0Importer_DryRun(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v1/users" && r.Method == http.MethodGet {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"users":       []interface{}{},
 				"next_cursor": "",
 			})
@@ -206,7 +206,7 @@ func TestAuth0Importer_DryRun_SkipsExisting(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v1/users" && r.Method == http.MethodGet {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"users": []map[string]interface{}{
 					{"id": "seki-1", "email": "existing@example.com"},
 				},
@@ -256,17 +256,17 @@ func TestAuth0Importer_LiveImport(t *testing.T) {
 		switch {
 		case r.URL.Path == "/api/v1/users" && r.Method == http.MethodGet:
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"users":       []interface{}{},
 				"next_cursor": "",
 			})
 		case r.URL.Path == "/api/v1/users" && r.Method == http.MethodPost:
 			var input map[string]interface{}
-			json.NewDecoder(r.Body).Decode(&input)
+			_ = json.NewDecoder(r.Body).Decode(&input)
 			createdUsers = append(createdUsers, input["email"].(string))
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"id":    "seki-new",
 				"email": input["email"],
 			})

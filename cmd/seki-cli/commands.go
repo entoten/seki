@@ -24,7 +24,9 @@ func runVersion() {
 func runKeygen(args []string) {
 	fs := flag.NewFlagSet("keygen", flag.ExitOnError)
 	output := fs.String("output", "signing.key", "file path for the private key")
-	fs.Parse(args)
+	if err := fs.Parse(args); err != nil {
+		fatalf("parsing flags: %v", err)
+	}
 
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -54,7 +56,9 @@ func runKeygen(args []string) {
 func runInit(args []string) {
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
 	nonInteractive := fs.Bool("non-interactive", false, "output default template without prompts")
-	fs.Parse(args)
+	if err := fs.Parse(args); err != nil {
+		fatalf("parsing flags: %v", err)
+	}
 
 	issuer := "http://localhost:8080"
 	driver := "sqlite"
@@ -134,7 +138,9 @@ func runUser(args []string, apiURL, apiKey string, jsonOutput bool) {
 	case "list":
 		fs := flag.NewFlagSet("user list", flag.ExitOnError)
 		limit := fs.Int("limit", 20, "max number of results")
-		fs.Parse(rest)
+		if err := fs.Parse(rest); err != nil {
+			fatalf("parsing flags: %v", err)
+		}
 
 		result, err := c.ListUsers(ctx, client.ListOptions{Limit: *limit})
 		if err != nil {
@@ -142,7 +148,7 @@ func runUser(args []string, apiURL, apiKey string, jsonOutput bool) {
 		}
 
 		if jsonOutput {
-			printJSON(result.Data)
+			_ = printJSON(result.Data)
 			return
 		}
 
@@ -151,13 +157,15 @@ func runUser(args []string, apiURL, apiKey string, jsonOutput bool) {
 		for _, u := range result.Data {
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", u.ID, u.Email, u.DisplayName, u.CreatedAt.Format("2006-01-02"))
 		}
-		w.Flush()
+		_ = w.Flush()
 
 	case "create":
 		fs := flag.NewFlagSet("user create", flag.ExitOnError)
 		email := fs.String("email", "", "user email (required)")
 		name := fs.String("name", "", "display name (required)")
-		fs.Parse(rest)
+		if err := fs.Parse(rest); err != nil {
+			fatalf("parsing flags: %v", err)
+		}
 
 		if *email == "" || *name == "" {
 			fmt.Fprintln(os.Stderr, "usage: seki-cli user create --email EMAIL --name NAME")
@@ -173,7 +181,7 @@ func runUser(args []string, apiURL, apiKey string, jsonOutput bool) {
 		}
 
 		if jsonOutput {
-			printJSON(user)
+			_ = printJSON(user)
 			return
 		}
 
@@ -191,14 +199,14 @@ func runUser(args []string, apiURL, apiKey string, jsonOutput bool) {
 		}
 
 		if jsonOutput {
-			printJSON(user)
+			_ = printJSON(user)
 			return
 		}
 
 		w := tableWriter()
 		fmt.Fprintln(w, "ID\tEMAIL\tNAME\tDISABLED\tCREATED")
 		fmt.Fprintf(w, "%s\t%s\t%s\t%v\t%s\n", user.ID, user.Email, user.DisplayName, user.Disabled, user.CreatedAt.Format("2006-01-02"))
-		w.Flush()
+		_ = w.Flush()
 
 	case "delete":
 		if len(rest) == 0 {
@@ -234,7 +242,9 @@ func runOrg(args []string, apiURL, apiKey string, jsonOutput bool) {
 	case "list":
 		fs := flag.NewFlagSet("org list", flag.ExitOnError)
 		limit := fs.Int("limit", 20, "max number of results")
-		fs.Parse(rest)
+		if err := fs.Parse(rest); err != nil {
+			fatalf("parsing flags: %v", err)
+		}
 
 		result, err := c.ListOrgs(ctx, client.ListOptions{Limit: *limit})
 		if err != nil {
@@ -242,7 +252,7 @@ func runOrg(args []string, apiURL, apiKey string, jsonOutput bool) {
 		}
 
 		if jsonOutput {
-			printJSON(result.Data)
+			_ = printJSON(result.Data)
 			return
 		}
 
@@ -251,13 +261,15 @@ func runOrg(args []string, apiURL, apiKey string, jsonOutput bool) {
 		for _, o := range result.Data {
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", o.ID, o.Slug, o.Name, o.CreatedAt.Format("2006-01-02"))
 		}
-		w.Flush()
+		_ = w.Flush()
 
 	case "create":
 		fs := flag.NewFlagSet("org create", flag.ExitOnError)
 		slug := fs.String("slug", "", "organization slug (required)")
 		name := fs.String("name", "", "organization name (required)")
-		fs.Parse(rest)
+		if err := fs.Parse(rest); err != nil {
+			fatalf("parsing flags: %v", err)
+		}
 
 		if *slug == "" || *name == "" {
 			fmt.Fprintln(os.Stderr, "usage: seki-cli org create --slug SLUG --name NAME")
@@ -273,7 +285,7 @@ func runOrg(args []string, apiURL, apiKey string, jsonOutput bool) {
 		}
 
 		if jsonOutput {
-			printJSON(org)
+			_ = printJSON(org)
 			return
 		}
 
@@ -291,14 +303,14 @@ func runOrg(args []string, apiURL, apiKey string, jsonOutput bool) {
 		}
 
 		if jsonOutput {
-			printJSON(org)
+			_ = printJSON(org)
 			return
 		}
 
 		w := tableWriter()
 		fmt.Fprintln(w, "ID\tSLUG\tNAME\tDOMAINS\tCREATED")
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", org.ID, org.Slug, org.Name, strings.Join(org.Domains, ","), org.CreatedAt.Format("2006-01-02"))
-		w.Flush()
+		_ = w.Flush()
 
 	case "delete":
 		if len(rest) == 0 {
@@ -338,7 +350,9 @@ func runAudit(args []string, apiURL, apiKey string, jsonOutput bool) {
 	actor := fs.String("actor", "", "filter by actor ID")
 	action := fs.String("action", "", "filter by action")
 	limit := fs.Int("limit", 20, "max number of results")
-	fs.Parse(rest)
+	if err := fs.Parse(rest); err != nil {
+		fatalf("parsing flags: %v", err)
+	}
 
 	c := client.New(apiURL, apiKey)
 	ctx := context.Background()
@@ -353,7 +367,7 @@ func runAudit(args []string, apiURL, apiKey string, jsonOutput bool) {
 	}
 
 	if jsonOutput {
-		printJSON(result.Data)
+		_ = printJSON(result.Data)
 		return
 	}
 
@@ -362,7 +376,7 @@ func runAudit(args []string, apiURL, apiKey string, jsonOutput bool) {
 	for _, e := range result.Data {
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", e.ID, e.ActorID, e.Action, e.Resource, e.ResourceID, e.CreatedAt.Format("2006-01-02 15:04:05"))
 	}
-	w.Flush()
+	_ = w.Flush()
 }
 
 // runMigrate runs database migrations.

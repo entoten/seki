@@ -16,9 +16,9 @@ import (
 
 const (
 	// TokenTypeEmailVerification is the type for email verification tokens.
-	TokenTypeEmailVerification = "email_verification"
+	TokenTypeEmailVerification = "email_verification" // #nosec G101 -- false positive: not hardcoded credentials
 	// TokenTypePasswordReset is the type for password reset tokens.
-	TokenTypePasswordReset = "password_reset"
+	TokenTypePasswordReset = "password_reset" // #nosec G101 -- false positive: not hardcoded credentials
 
 	emailVerificationTTL = 24 * time.Hour
 	passwordResetTTL     = 1 * time.Hour

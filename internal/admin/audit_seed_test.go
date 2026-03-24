@@ -26,7 +26,7 @@ func TestAuditLogsViaAPI(t *testing.T) {
 	}
 
 	var resp map[string]interface{}
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	data, ok := resp["data"].([]interface{})
 	if !ok {
 		t.Fatal("expected data array")
@@ -130,7 +130,7 @@ func TestSessionsViaAPI(t *testing.T) {
 		t.Fatalf("create user: expected 201, got %d", rec.Code)
 	}
 	var created storage.User
-	json.NewDecoder(rec.Body).Decode(&created)
+	_ = json.NewDecoder(rec.Body).Decode(&created)
 
 	// Create a session for that user.
 	now := time.Now().UTC().Truncate(time.Second)

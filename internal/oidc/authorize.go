@@ -214,5 +214,5 @@ func (p *Provider) redirectToLogin(w http.ResponseWriter, r *http.Request) {
 func renderError(w http.ResponseWriter, status int, errorCode, description string) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(status)
-	fmt.Fprintf(w, "error: %s\n%s\n", errorCode, description)
+	fmt.Fprintf(w, "error: %s\n%s\n", errorCode, description) // #nosec G705 -- false positive: Content-Type is text/plain, no XSS risk
 }

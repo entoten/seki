@@ -444,7 +444,7 @@ func tokenError(w http.ResponseWriter, status int, errCode, description string) 
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Pragma", "no-cache")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{
+	_ = json.NewEncoder(w).Encode(map[string]string{
 		"error":             errCode,
 		"error_description": description,
 	})
@@ -468,5 +468,5 @@ func writeTokenResponse(w http.ResponseWriter, accessToken, idToken, refreshToke
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Pragma", "no-cache")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }

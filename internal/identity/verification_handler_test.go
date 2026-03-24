@@ -41,7 +41,7 @@ func TestHandler_RequestEmailVerification(t *testing.T) {
 	}
 
 	var resp map[string]string
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	if resp["status"] != "verification_email_requested" {
 		t.Errorf("status = %q", resp["status"])
 	}

@@ -15,10 +15,10 @@ type window struct {
 
 // attempts tracks login failure attempts for brute-force protection.
 type attempts struct {
-	mu        sync.Mutex
-	failures  int
-	lockedAt  time.Time
-	lastSeen  time.Time
+	mu       sync.Mutex
+	failures int
+	lockedAt time.Time
+	lastSeen time.Time
 }
 
 // Limiter provides in-memory rate limiting and brute-force protection.

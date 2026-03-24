@@ -23,8 +23,6 @@ func (h *VerificationHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /identity/password-reset/confirm", h.handleResetPassword)
 }
 
-type emailVerificationRequest struct{}
-
 type emailVerificationConfirmRequest struct {
 	Token string `json:"token"`
 }
@@ -137,5 +135,5 @@ func (h *VerificationHandler) handleResetPassword(w http.ResponseWriter, r *http
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(v)
 }

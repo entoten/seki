@@ -28,7 +28,7 @@ func TestOrgCRUDViaAPI(t *testing.T) {
 	}
 
 	var org map[string]any
-	json.NewDecoder(rec.Body).Decode(&org)
+	_ = json.NewDecoder(rec.Body).Decode(&org)
 	if org["slug"] != "acme" {
 		t.Fatalf("slug mismatch: %v", org["slug"])
 	}
@@ -50,7 +50,7 @@ func TestOrgCRUDViaAPI(t *testing.T) {
 		t.Fatalf("update org: expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 	var updated map[string]any
-	json.NewDecoder(rec.Body).Decode(&updated)
+	_ = json.NewDecoder(rec.Body).Decode(&updated)
 	if updated["name"] != "Acme Corporation" {
 		t.Fatalf("name not updated: %v", updated["name"])
 	}
@@ -63,7 +63,7 @@ func TestOrgCRUDViaAPI(t *testing.T) {
 		t.Fatalf("list orgs: expected 200, got %d", rec.Code)
 	}
 	var listResp map[string]any
-	json.NewDecoder(rec.Body).Decode(&listResp)
+	_ = json.NewDecoder(rec.Body).Decode(&listResp)
 	data := listResp["data"].([]any)
 	if len(data) != 1 {
 		t.Fatalf("expected 1 org, got %d", len(data))
@@ -141,7 +141,7 @@ func TestMemberViaAPI(t *testing.T) {
 		t.Fatalf("create user: expected 201, got %d: %s", rec.Code, rec.Body.String())
 	}
 	var createdUser storage.User
-	json.NewDecoder(rec.Body).Decode(&createdUser)
+	_ = json.NewDecoder(rec.Body).Decode(&createdUser)
 
 	// Add member
 	body = `{"user_id":"` + createdUser.ID + `","role":"admin"}`
@@ -160,7 +160,7 @@ func TestMemberViaAPI(t *testing.T) {
 		t.Fatalf("list members: expected 200, got %d", rec.Code)
 	}
 	var resp map[string]any
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	members := resp["data"].([]any)
 	if len(members) != 1 {
 		t.Fatalf("expected 1 member, got %d", len(members))
@@ -175,7 +175,7 @@ func TestMemberViaAPI(t *testing.T) {
 		t.Fatalf("update member role: expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 	var memberResp map[string]any
-	json.NewDecoder(rec.Body).Decode(&memberResp)
+	_ = json.NewDecoder(rec.Body).Decode(&memberResp)
 	if memberResp["role"] != "viewer" {
 		t.Fatalf("role not updated: %v", memberResp["role"])
 	}
@@ -192,7 +192,7 @@ func TestMemberViaAPI(t *testing.T) {
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/orgs/members-org/members", nil)
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	members = resp["data"].([]any)
 	if len(members) != 0 {
 		t.Fatalf("expected 0 members after remove, got %d", len(members))
@@ -233,7 +233,7 @@ func TestRoleCRUDViaAPI(t *testing.T) {
 		t.Fatalf("list roles: expected 200, got %d", rec.Code)
 	}
 	var resp map[string]any
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	roles := resp["data"].([]any)
 	if len(roles) != 1 {
 		t.Fatalf("expected 1 role, got %d", len(roles))
@@ -248,7 +248,7 @@ func TestRoleCRUDViaAPI(t *testing.T) {
 		t.Fatalf("update role: expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 	var roleResp map[string]any
-	json.NewDecoder(rec.Body).Decode(&roleResp)
+	_ = json.NewDecoder(rec.Body).Decode(&roleResp)
 	perms := roleResp["permissions"].([]any)
 	if len(perms) != 1 || perms[0] != "read" {
 		t.Fatalf("permissions not updated: %v", perms)
@@ -266,7 +266,7 @@ func TestRoleCRUDViaAPI(t *testing.T) {
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/orgs/roles-org/roles", nil)
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	roles = resp["data"].([]any)
 	if len(roles) != 0 {
 		t.Fatalf("expected 0 roles after delete, got %d", len(roles))

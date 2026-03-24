@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/Monet/seki/internal/config"
 	"github.com/Monet/seki/internal/oidc"
 	"github.com/Monet/seki/internal/ratelimit"
 	"github.com/Monet/seki/internal/session"
 	"github.com/Monet/seki/internal/storage"
-	"golang.org/x/crypto/bcrypt"
-
 	_ "github.com/Monet/seki/internal/storage/sqlite"
 )
 
@@ -298,6 +298,7 @@ func TestToken_MissingCode(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
@@ -327,6 +328,7 @@ func TestToken_CodeClientMismatch(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
@@ -356,6 +358,7 @@ func TestToken_RedirectURIMismatch(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
@@ -379,6 +382,7 @@ func TestToken_PKCEMissingVerifier(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
@@ -399,6 +403,7 @@ func TestToken_ClientCredentials_Unauthorized(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
@@ -416,6 +421,7 @@ func TestToken_RefreshToken_MissingToken(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
@@ -448,6 +454,7 @@ func TestToken_RefreshToken_ClientMismatch(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
@@ -485,6 +492,7 @@ func TestToken_RefreshToken_Expired(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}

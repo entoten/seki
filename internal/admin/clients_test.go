@@ -22,7 +22,7 @@ func TestClientCRUDViaAPI(t *testing.T) {
 	}
 
 	var client map[string]any
-	json.NewDecoder(rec.Body).Decode(&client)
+	_ = json.NewDecoder(rec.Body).Decode(&client)
 	if client["id"] != "my-app" {
 		t.Fatalf("id mismatch: %v", client["id"])
 	}
@@ -42,7 +42,7 @@ func TestClientCRUDViaAPI(t *testing.T) {
 	}
 
 	var fetched map[string]any
-	json.NewDecoder(rec.Body).Decode(&fetched)
+	_ = json.NewDecoder(rec.Body).Decode(&fetched)
 	if fetched["id"] != "my-app" {
 		t.Fatalf("fetched id mismatch: %v", fetched["id"])
 	}
@@ -55,7 +55,7 @@ func TestClientCRUDViaAPI(t *testing.T) {
 		t.Fatalf("list clients: expected 200, got %d", rec.Code)
 	}
 	var listResp map[string]any
-	json.NewDecoder(rec.Body).Decode(&listResp)
+	_ = json.NewDecoder(rec.Body).Decode(&listResp)
 	data := listResp["data"].([]any)
 	if len(data) != 1 {
 		t.Fatalf("expected 1 client, got %d", len(data))

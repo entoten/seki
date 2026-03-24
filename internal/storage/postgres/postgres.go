@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/Monet/seki/internal/config"
@@ -34,11 +35,11 @@ func New(ctx context.Context, cfg config.DatabaseConfig) (*Store, error) {
 		return nil, fmt.Errorf("postgres: parse config: %w", err)
 	}
 	// Apply connection pool settings.
-	if cfg.MaxOpenConns > 0 {
-		poolCfg.MaxConns = int32(cfg.MaxOpenConns)
+	if cfg.MaxOpenConns > 0 && cfg.MaxOpenConns <= math.MaxInt32 {
+		poolCfg.MaxConns = int32(cfg.MaxOpenConns) // #nosec G115 -- bounds checked
 	}
-	if cfg.MaxIdleConns > 0 {
-		poolCfg.MinConns = int32(cfg.MaxIdleConns)
+	if cfg.MaxIdleConns > 0 && cfg.MaxIdleConns <= math.MaxInt32 {
+		poolCfg.MinConns = int32(cfg.MaxIdleConns) // #nosec G115 -- bounds checked
 	}
 	if d, parseErr := time.ParseDuration(cfg.ConnMaxLifetime); parseErr == nil {
 		poolCfg.MaxConnLifetime = d

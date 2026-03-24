@@ -75,7 +75,7 @@ type KeycloakGroup struct {
 
 // ParseKeycloakExport reads and parses a Keycloak realm export file.
 func ParseKeycloakExport(path string) (*KeycloakRealmExport, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) // #nosec G304 -- intentional: file path from user CLI argument
 	if err != nil {
 		return nil, fmt.Errorf("open export file: %w", err)
 	}

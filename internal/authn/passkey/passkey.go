@@ -70,8 +70,8 @@ func (s *Service) BeginRegistration(ctx context.Context, user *storage.User) (*p
 	excludeList := make([]protocol.CredentialDescriptor, len(creds))
 	for i, c := range creds {
 		excludeList[i] = protocol.CredentialDescriptor{
-			Type:            protocol.PublicKeyCredentialType,
-			CredentialID:    c.CredentialID,
+			Type:         protocol.PublicKeyCredentialType,
+			CredentialID: c.CredentialID,
 		}
 	}
 

@@ -14,7 +14,7 @@ import (
 
 // Limits defines maximum lengths for common input fields.
 const (
-	MaxEmailLen       = 254  // RFC 5321
+	MaxEmailLen       = 254 // RFC 5321
 	MaxDisplayNameLen = 256
 	MaxSlugLen        = 64
 	MaxNameLen        = 256

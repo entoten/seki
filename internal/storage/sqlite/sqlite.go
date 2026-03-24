@@ -540,6 +540,7 @@ func (s *Store) DeleteRefreshTokensByUserID(ctx context.Context, userID string) 
 // ---------------------------------------------------------------------------
 
 // credentialColumns is the column list used for credential SELECT queries.
+// #nosec G101 -- false positive: not hardcoded credentials, just SQL column names
 const credentialColumns = `id, user_id, type, secret, metadata, credential_id, public_key, attestation_type, aaguid, sign_count, display_name, last_used_at, created_at, updated_at`
 
 func (s *Store) CreateCredential(ctx context.Context, cred *storage.Credential) error {

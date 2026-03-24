@@ -42,7 +42,7 @@ func (h *Handler) handleListUserSessions(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sessionListResponse{Sessions: sessions})
+	_ = json.NewEncoder(w).Encode(sessionListResponse{Sessions: sessions})
 }
 
 func (h *Handler) handleRevokeUserSession(w http.ResponseWriter, r *http.Request) {

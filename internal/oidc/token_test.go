@@ -199,6 +199,7 @@ func TestToken_AuthorizationCode_ValidExchange(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body := decodeTokenResponse(t, resp)
 		t.Fatalf("expected 200, got %d: %v", resp.StatusCode, body)
@@ -275,6 +276,7 @@ func TestToken_AuthorizationCode_PKCEVerification(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
@@ -305,6 +307,7 @@ func TestToken_AuthorizationCode_SingleUse(t *testing.T) {
 
 	// First use should succeed.
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body := decodeTokenResponse(t, resp)
 		t.Fatalf("expected 200, got %d: %v", resp.StatusCode, body)
@@ -314,6 +317,7 @@ func TestToken_AuthorizationCode_SingleUse(t *testing.T) {
 
 	// Second use should fail.
 	resp2 := h.doTokenRequest(t, params)
+	defer resp2.Body.Close()
 	if resp2.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 on second use, got %d", resp2.StatusCode)
 	}
@@ -344,6 +348,7 @@ func TestToken_AuthorizationCode_ExpiredCode(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
@@ -364,6 +369,7 @@ func TestToken_ClientCredentials_ReturnsAccessTokenOnly(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body := decodeTokenResponse(t, resp)
 		t.Fatalf("expected 200, got %d: %v", resp.StatusCode, body)
@@ -395,6 +401,7 @@ func TestToken_ClientCredentials_RequiresSecret(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", resp.StatusCode)
 	}
@@ -413,6 +420,7 @@ func TestToken_ClientCredentials_BasicAuth(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params, "cc-client", "cc-secret")
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body := decodeTokenResponse(t, resp)
 		t.Fatalf("expected 200, got %d: %v", resp.StatusCode, body)
@@ -454,6 +462,7 @@ func TestToken_RefreshToken_ReturnsNewTokens(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body := decodeTokenResponse(t, resp)
 		t.Fatalf("expected 200, got %d: %v", resp.StatusCode, body)
@@ -505,6 +514,7 @@ func TestToken_RefreshToken_OldTokenInvalidated(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body := decodeTokenResponse(t, resp)
 		t.Fatalf("expected 200, got %d: %v", resp.StatusCode, body)
@@ -524,6 +534,7 @@ func TestToken_RefreshToken_OldTokenInvalidated(t *testing.T) {
 
 	// Using the old token again should fail (theft detection).
 	resp2 := h.doTokenRequest(t, params)
+	defer resp2.Body.Close()
 	if resp2.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 on reuse, got %d", resp2.StatusCode)
 	}
@@ -581,6 +592,7 @@ func TestToken_RefreshToken_TheftDetection(t *testing.T) {
 		"client_secret": {"test-secret"},
 	}
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body := decodeTokenResponse(t, resp)
 		t.Fatalf("expected 200, got %d: %v", resp.StatusCode, body)
@@ -589,6 +601,7 @@ func TestToken_RefreshToken_TheftDetection(t *testing.T) {
 
 	// Now try to reuse token1 (already deleted) - this simulates theft.
 	resp2 := h.doTokenRequest(t, params)
+	defer resp2.Body.Close()
 	if resp2.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 on theft detection, got %d", resp2.StatusCode)
 	}
@@ -612,6 +625,7 @@ func TestToken_InvalidGrantType(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
@@ -640,6 +654,7 @@ func TestToken_AuthorizationCode_PublicClient(t *testing.T) {
 	}
 
 	resp := h.doTokenRequest(t, params)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body := decodeTokenResponse(t, resp)
 		t.Fatalf("expected 200, got %d: %v", resp.StatusCode, body)

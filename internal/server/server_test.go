@@ -60,7 +60,7 @@ func TestHealthzLive(t *testing.T) {
 	}
 
 	var body map[string]string
-	json.NewDecoder(rec.Body).Decode(&body)
+	_ = json.NewDecoder(rec.Body).Decode(&body)
 	if body["status"] != "alive" {
 		t.Errorf("status = %q, want alive", body["status"])
 	}
@@ -78,7 +78,7 @@ func TestHealthzReady(t *testing.T) {
 	}
 
 	var body map[string]string
-	json.NewDecoder(rec.Body).Decode(&body)
+	_ = json.NewDecoder(rec.Body).Decode(&body)
 	if body["status"] != "ok" {
 		t.Errorf("status = %q, want ok", body["status"])
 	}

@@ -48,7 +48,6 @@ func createTestUserAndSessions(t *testing.T, store storage.Storage, userID strin
 	}
 }
 
-
 func TestListUserSessions(t *testing.T) {
 	s, err := storage.New(storage.TestDatabaseConfig())
 	if err != nil {

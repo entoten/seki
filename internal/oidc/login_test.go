@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/Monet/seki/internal/config"
 	"github.com/Monet/seki/internal/oidc"
 	"github.com/Monet/seki/internal/session"
 	"github.com/Monet/seki/internal/storage"
-	"golang.org/x/crypto/bcrypt"
-
 	_ "github.com/Monet/seki/internal/storage/sqlite"
 )
 

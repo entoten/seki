@@ -108,7 +108,7 @@ func TestGetUser(t *testing.T) {
 		t.Fatalf("create: expected 201, got %d", rec.Code)
 	}
 	var created scim.SCIMUser
-	json.NewDecoder(rec.Body).Decode(&created)
+	_ = json.NewDecoder(rec.Body).Decode(&created)
 
 	// Get user.
 	req = httptest.NewRequest(http.MethodGet, "/scim/v2/Users/"+created.ID, nil)
@@ -119,7 +119,7 @@ func TestGetUser(t *testing.T) {
 	}
 
 	var got scim.SCIMUser
-	json.NewDecoder(rec.Body).Decode(&got)
+	_ = json.NewDecoder(rec.Body).Decode(&got)
 	if got.ID != created.ID {
 		t.Fatalf("ID mismatch: %s vs %s", got.ID, created.ID)
 	}
@@ -151,7 +151,7 @@ func TestPatchUser(t *testing.T) {
 		t.Fatalf("create: expected 201, got %d", rec.Code)
 	}
 	var created scim.SCIMUser
-	json.NewDecoder(rec.Body).Decode(&created)
+	_ = json.NewDecoder(rec.Body).Decode(&created)
 
 	// Patch: update displayName.
 	patchBody := `{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[{"op":"replace","path":"displayName","value":"Updated"}]}`
@@ -163,7 +163,7 @@ func TestPatchUser(t *testing.T) {
 	}
 
 	var patched scim.SCIMUser
-	json.NewDecoder(rec.Body).Decode(&patched)
+	_ = json.NewDecoder(rec.Body).Decode(&patched)
 	if patched.DisplayName != "Updated" {
 		t.Fatalf("displayName not updated: %s", patched.DisplayName)
 	}
@@ -183,7 +183,7 @@ func TestPatchUserDeactivate(t *testing.T) {
 		t.Fatalf("create: expected 201, got %d", rec.Code)
 	}
 	var created scim.SCIMUser
-	json.NewDecoder(rec.Body).Decode(&created)
+	_ = json.NewDecoder(rec.Body).Decode(&created)
 
 	// Deactivate via PATCH.
 	patchBody := `{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[{"op":"replace","path":"active","value":false}]}`
@@ -195,7 +195,7 @@ func TestPatchUserDeactivate(t *testing.T) {
 	}
 
 	var patched scim.SCIMUser
-	json.NewDecoder(rec.Body).Decode(&patched)
+	_ = json.NewDecoder(rec.Body).Decode(&patched)
 	if patched.Active {
 		t.Fatal("expected active=false after deactivation")
 	}
@@ -213,7 +213,7 @@ func TestDeleteUser(t *testing.T) {
 		t.Fatalf("create: expected 201, got %d", rec.Code)
 	}
 	var created scim.SCIMUser
-	json.NewDecoder(rec.Body).Decode(&created)
+	_ = json.NewDecoder(rec.Body).Decode(&created)
 
 	// Delete (soft).
 	req = httptest.NewRequest(http.MethodDelete, "/scim/v2/Users/"+created.ID, nil)
@@ -231,7 +231,7 @@ func TestDeleteUser(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 	var got scim.SCIMUser
-	json.NewDecoder(rec.Body).Decode(&got)
+	_ = json.NewDecoder(rec.Body).Decode(&got)
 	if got.Active {
 		t.Fatal("expected user to be deactivated after DELETE")
 	}
@@ -249,7 +249,7 @@ func TestListGroups(t *testing.T) {
 	}
 
 	var resp scim.SCIMListResponse
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	if resp.TotalResults != 0 {
 		t.Fatalf("expected 0 total results, got %d", resp.TotalResults)
 	}
@@ -268,7 +268,7 @@ func TestCreateAndGetGroup(t *testing.T) {
 	}
 
 	var created scim.SCIMGroup
-	json.NewDecoder(rec.Body).Decode(&created)
+	_ = json.NewDecoder(rec.Body).Decode(&created)
 	if created.DisplayName != "Engineering" {
 		t.Fatalf("displayName mismatch: %s", created.DisplayName)
 	}
@@ -282,7 +282,7 @@ func TestCreateAndGetGroup(t *testing.T) {
 	}
 
 	var got scim.SCIMGroup
-	json.NewDecoder(rec.Body).Decode(&got)
+	_ = json.NewDecoder(rec.Body).Decode(&got)
 	if got.DisplayName != "Engineering" {
 		t.Fatalf("displayName mismatch: %s", got.DisplayName)
 	}
@@ -352,7 +352,7 @@ func TestFilterByUserName(t *testing.T) {
 	}
 
 	var resp scim.SCIMListResponse
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	if resp.TotalResults != 1 {
 		t.Fatalf("expected 1 result, got %d", resp.TotalResults)
 	}
@@ -386,7 +386,7 @@ func TestFilterByUserNameNotFound(t *testing.T) {
 	}
 
 	var resp scim.SCIMListResponse
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	if resp.TotalResults != 0 {
 		t.Fatalf("expected 0 results, got %d", resp.TotalResults)
 	}
@@ -404,7 +404,7 @@ func TestSchemas(t *testing.T) {
 	}
 
 	var resp scim.SCIMListResponse
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	if resp.TotalResults != 2 {
 		t.Fatalf("expected 2 schemas, got %d", resp.TotalResults)
 	}
@@ -422,7 +422,7 @@ func TestResourceTypes(t *testing.T) {
 	}
 
 	var resp scim.SCIMListResponse
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	if resp.TotalResults != 2 {
 		t.Fatalf("expected 2 resource types, got %d", resp.TotalResults)
 	}
@@ -440,7 +440,7 @@ func TestDeleteGroup(t *testing.T) {
 		t.Fatalf("create: expected 201, got %d: %s", rec.Code, rec.Body.String())
 	}
 	var created scim.SCIMGroup
-	json.NewDecoder(rec.Body).Decode(&created)
+	_ = json.NewDecoder(rec.Body).Decode(&created)
 
 	// Delete.
 	req = httptest.NewRequest(http.MethodDelete, "/scim/v2/Groups/"+created.ID, nil)

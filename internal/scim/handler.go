@@ -66,7 +66,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 func (h *Handler) handleServiceProviderConfig(w http.ResponseWriter, _ *http.Request) {
 	config := map[string]any{
-		"schemas": []string{"urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"},
+		"schemas":          []string{"urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"},
 		"documentationUri": "https://tools.ietf.org/html/rfc7644",
 		"patch": map[string]any{
 			"supported": true,
@@ -218,7 +218,7 @@ func (h *Handler) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert to SCIM and apply filter.
-	var scimUsers []*SCIMUser
+	scimUsers := make([]*SCIMUser, 0, len(users))
 	for _, u := range users {
 		su := UserToSCIM(u, h.baseURL)
 		if filter != nil && !filter.MatchesUser(su) {
@@ -297,7 +297,7 @@ func (h *Handler) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/scim+json")
 	w.Header().Set("Location", result.Meta.Location)
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(result)
+	_ = json.NewEncoder(w).Encode(result)
 }
 
 func (h *Handler) handlePatchUser(w http.ResponseWriter, r *http.Request) {
@@ -438,7 +438,7 @@ func (h *Handler) handleListGroups(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var groups []*SCIMGroup
+	groups := make([]*SCIMGroup, 0, len(orgs))
 	for _, org := range orgs {
 		members, _ := h.store.ListMembers(r.Context(), org.ID)
 		groups = append(groups, OrgToSCIMGroup(org, members, h.baseURL))
@@ -536,7 +536,7 @@ func (h *Handler) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/scim+json")
 	w.Header().Set("Location", result.Meta.Location)
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(result)
+	_ = json.NewEncoder(w).Encode(result)
 }
 
 func (h *Handler) handlePatchGroup(w http.ResponseWriter, r *http.Request) {
@@ -649,13 +649,13 @@ func parsePagination(startIndexStr, countStr string) (startIndex, count int) {
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/scim+json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 func writeSCIMError(w http.ResponseWriter, status int, detail string) {
 	w.Header().Set("Content-Type", "application/scim+json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(SCIMError{
+	_ = json.NewEncoder(w).Encode(SCIMError{
 		Schemas: []string{ErrorSchema},
 		Detail:  detail,
 		Status:  fmt.Sprintf("%d", status),

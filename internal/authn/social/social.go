@@ -17,6 +17,7 @@ import (
 )
 
 // Well-known OAuth2 endpoints for supported providers.
+// #nosec G101 -- false positive: these are public OAuth2 endpoint URLs, not credentials
 var knownProviders = map[string]Provider{
 	"google": {
 		Name:        "google",

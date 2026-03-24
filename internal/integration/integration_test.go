@@ -14,13 +14,14 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/Monet/seki/internal/config"
 	"github.com/Monet/seki/internal/crypto"
 	"github.com/Monet/seki/internal/oidc"
 	"github.com/Monet/seki/internal/session"
 	"github.com/Monet/seki/internal/storage"
 	_ "github.com/Monet/seki/internal/storage/sqlite"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // TestFullOIDCAuthorizationCodeFlow exercises the entire critical OIDC path
@@ -215,7 +216,7 @@ func TestFullOIDCAuthorizationCodeFlow(t *testing.T) {
 	}
 
 	var tokenResp map[string]interface{}
-	json.NewDecoder(rec.Body).Decode(&tokenResp)
+	_ = json.NewDecoder(rec.Body).Decode(&tokenResp)
 
 	accessToken, ok := tokenResp["access_token"].(string)
 	if !ok || accessToken == "" {
@@ -259,7 +260,7 @@ func TestFullOIDCAuthorizationCodeFlow(t *testing.T) {
 	}
 
 	var userInfo map[string]interface{}
-	json.NewDecoder(rec.Body).Decode(&userInfo)
+	_ = json.NewDecoder(rec.Body).Decode(&userInfo)
 	if userInfo["sub"] != "user-e2e" {
 		t.Errorf("step5: sub = %v, want user-e2e", userInfo["sub"])
 	}
@@ -288,7 +289,7 @@ func TestFullOIDCAuthorizationCodeFlow(t *testing.T) {
 	}
 
 	var refreshResp map[string]interface{}
-	json.NewDecoder(rec.Body).Decode(&refreshResp)
+	_ = json.NewDecoder(rec.Body).Decode(&refreshResp)
 	if refreshResp["access_token"] == nil || refreshResp["access_token"] == "" {
 		t.Fatal("step6: missing access_token in refresh response")
 	}

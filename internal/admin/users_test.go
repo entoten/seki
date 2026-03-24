@@ -94,7 +94,7 @@ func TestGetUser(t *testing.T) {
 		t.Fatalf("create expected 201, got %d", rec.Code)
 	}
 	var created storage.User
-	json.NewDecoder(rec.Body).Decode(&created)
+	_ = json.NewDecoder(rec.Body).Decode(&created)
 
 	// Get the user.
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/users/"+created.ID, nil)
@@ -105,7 +105,7 @@ func TestGetUser(t *testing.T) {
 	}
 
 	var got storage.User
-	json.NewDecoder(rec.Body).Decode(&got)
+	_ = json.NewDecoder(rec.Body).Decode(&got)
 	if got.Email != "bob@example.com" {
 		t.Fatalf("email mismatch: %s", got.Email)
 	}
@@ -126,7 +126,7 @@ func TestGetUserNotFound(t *testing.T) {
 	}
 
 	var problem admin.ProblemDetail
-	json.NewDecoder(rec.Body).Decode(&problem)
+	_ = json.NewDecoder(rec.Body).Decode(&problem)
 	if problem.Status != 404 {
 		t.Fatalf("problem status mismatch: %d", problem.Status)
 	}
@@ -159,7 +159,7 @@ func TestListUsersWithPagination(t *testing.T) {
 		Users      []storage.User `json:"users"`
 		NextCursor string         `json:"next_cursor"`
 	}
-	json.NewDecoder(rec.Body).Decode(&page1)
+	_ = json.NewDecoder(rec.Body).Decode(&page1)
 	if len(page1.Users) != 2 {
 		t.Fatalf("expected 2 users, got %d", len(page1.Users))
 	}
@@ -179,7 +179,7 @@ func TestListUsersWithPagination(t *testing.T) {
 		Users      []storage.User `json:"users"`
 		NextCursor string         `json:"next_cursor"`
 	}
-	json.NewDecoder(rec.Body).Decode(&page2)
+	_ = json.NewDecoder(rec.Body).Decode(&page2)
 	if len(page2.Users) != 1 {
 		t.Fatalf("expected 1 user on page 2, got %d", len(page2.Users))
 	}
@@ -214,7 +214,7 @@ func TestListUsersWithEmailFilter(t *testing.T) {
 	var resp struct {
 		Users []storage.User `json:"users"`
 	}
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	if len(resp.Users) != 1 {
 		t.Fatalf("expected 1 user, got %d", len(resp.Users))
 	}
@@ -229,7 +229,7 @@ func TestListUsersWithEmailFilter(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	if len(resp.Users) != 0 {
 		t.Fatalf("expected 0 users, got %d", len(resp.Users))
 	}
@@ -248,7 +248,7 @@ func TestUpdateUserPartialFields(t *testing.T) {
 		t.Fatalf("create: expected 201, got %d", rec.Code)
 	}
 	var created storage.User
-	json.NewDecoder(rec.Body).Decode(&created)
+	_ = json.NewDecoder(rec.Body).Decode(&created)
 
 	// Partial update: only display_name.
 	patchBody := `{"display_name":"Updated"}`
@@ -260,7 +260,7 @@ func TestUpdateUserPartialFields(t *testing.T) {
 	}
 
 	var updated storage.User
-	json.NewDecoder(rec.Body).Decode(&updated)
+	_ = json.NewDecoder(rec.Body).Decode(&updated)
 	if updated.DisplayName != "Updated" {
 		t.Fatalf("display_name not updated: %s", updated.DisplayName)
 	}
@@ -276,7 +276,7 @@ func TestUpdateUserPartialFields(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("patch disabled: expected 200, got %d", rec.Code)
 	}
-	json.NewDecoder(rec.Body).Decode(&updated)
+	_ = json.NewDecoder(rec.Body).Decode(&updated)
 	if !updated.Disabled {
 		t.Fatal("disabled should be true")
 	}
@@ -298,7 +298,7 @@ func TestDeleteUser(t *testing.T) {
 		t.Fatalf("create: expected 201, got %d", rec.Code)
 	}
 	var created storage.User
-	json.NewDecoder(rec.Body).Decode(&created)
+	_ = json.NewDecoder(rec.Body).Decode(&created)
 
 	// Delete.
 	req = httptest.NewRequest(http.MethodDelete, "/api/v1/users/"+created.ID, nil)

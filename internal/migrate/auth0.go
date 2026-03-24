@@ -43,7 +43,7 @@ type Auth0Export struct {
 // ParseAuth0Export reads an Auth0 export file. It handles both a bare JSON array
 // of users and an object with "users" and optional "clients" keys.
 func ParseAuth0Export(path string) (*Auth0Export, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) // #nosec G304 -- intentional: file path from user CLI argument
 	if err != nil {
 		return nil, fmt.Errorf("open export file: %w", err)
 	}

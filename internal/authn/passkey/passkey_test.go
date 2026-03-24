@@ -644,7 +644,7 @@ func TestGetInactiveCredentials(t *testing.T) {
 
 	now := time.Now().UTC().Truncate(time.Second)
 	oldTime := now.Add(-100 * 24 * time.Hour) // 100 days ago
-	recentTime := now.Add(-1 * time.Hour)      // 1 hour ago
+	recentTime := now.Add(-1 * time.Hour)     // 1 hour ago
 
 	// Credential 1: used 100 days ago (inactive).
 	cred1 := &storage.Credential{

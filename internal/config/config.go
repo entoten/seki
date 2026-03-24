@@ -2,19 +2,19 @@ package config
 
 // Config holds the top-level configuration for Seki.
 type Config struct {
-	Server         ServerConfig          `yaml:"server"`
-	Database       DatabaseConfig        `yaml:"database"`
-	Signing        SigningConfig         `yaml:"signing"`
-	Clients        []ClientConfig        `yaml:"clients"`
-	Organizations  []OrganizationConfig  `yaml:"organizations"`
-	Authentication AuthenticationConfig  `yaml:"authentication"`
-	Session        SessionConfig         `yaml:"session"`
-	Audit          AuditConfig           `yaml:"audit"`
-	Webhooks       WebhooksConfig        `yaml:"webhooks"`
-	Admin          AdminConfig           `yaml:"admin"`
-	RateLimit      RateLimitConfig       `yaml:"rate_limit"`
-	CORS           CORSConfig            `yaml:"cors"`
-	Log            LogConfig             `yaml:"log"`
+	Server         ServerConfig         `yaml:"server"`
+	Database       DatabaseConfig       `yaml:"database"`
+	Signing        SigningConfig        `yaml:"signing"`
+	Clients        []ClientConfig       `yaml:"clients"`
+	Organizations  []OrganizationConfig `yaml:"organizations"`
+	Authentication AuthenticationConfig `yaml:"authentication"`
+	Session        SessionConfig        `yaml:"session"`
+	Audit          AuditConfig          `yaml:"audit"`
+	Webhooks       WebhooksConfig       `yaml:"webhooks"`
+	Admin          AdminConfig          `yaml:"admin"`
+	RateLimit      RateLimitConfig      `yaml:"rate_limit"`
+	CORS           CORSConfig           `yaml:"cors"`
+	Log            LogConfig            `yaml:"log"`
 }
 
 // LogConfig holds structured logging settings.
@@ -61,9 +61,9 @@ type SessionConfig struct {
 type DatabaseConfig struct {
 	Driver          string `yaml:"driver"`
 	DSN             string `yaml:"dsn"`
-	MaxOpenConns    int    `yaml:"max_open_conns"`    // default: 25
-	MaxIdleConns    int    `yaml:"max_idle_conns"`    // default: 5
-	ConnMaxLifetime string `yaml:"conn_max_lifetime"` // default: "5m"
+	MaxOpenConns    int    `yaml:"max_open_conns"`     // default: 25
+	MaxIdleConns    int    `yaml:"max_idle_conns"`     // default: 5
+	ConnMaxLifetime string `yaml:"conn_max_lifetime"`  // default: "5m"
 	ConnMaxIdleTime string `yaml:"conn_max_idle_time"` // default: "1m"
 }
 

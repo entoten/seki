@@ -9,12 +9,12 @@ import (
 
 // OAuthClient represents an OAuth2/OIDC client registered with seki.
 type OAuthClient struct {
-	ID           string   `json:"id"`
-	Name         string   `json:"name"`
-	RedirectURIs []string `json:"redirect_uris"`
-	GrantTypes   []string `json:"grant_types"`
-	Scopes       []string `json:"scopes"`
-	PKCERequired bool     `json:"pkce_required"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	RedirectURIs []string  `json:"redirect_uris"`
+	GrantTypes   []string  `json:"grant_types"`
+	Scopes       []string  `json:"scopes"`
+	PKCERequired bool      `json:"pkce_required"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }

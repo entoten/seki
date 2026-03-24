@@ -183,7 +183,7 @@ func (s *Server) registerAuthnRoutes() {
 func (s *Server) handleHealthzLive(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "alive"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "alive"})
 }
 
 // handleHealthzReady checks DB connectivity (readiness probe).
@@ -199,7 +199,7 @@ func (s *Server) handleHealthzReady(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpStatus)
-	json.NewEncoder(w).Encode(map[string]string{"status": status})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": status})
 }
 
 // ServeHTTP implements http.Handler, delegating to the inner server handler.

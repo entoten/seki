@@ -120,7 +120,7 @@ func (s *fakeServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *fakeServer) writeProblem(w http.ResponseWriter, status int, detail string) {
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"type":   "about:blank",
 		"title":  http.StatusText(status),
 		"status": status,
@@ -131,7 +131,7 @@ func (s *fakeServer) writeProblem(w http.ResponseWriter, status int, detail stri
 func (s *fakeServer) writeJSON(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 // --- User handlers ---
@@ -187,7 +187,7 @@ func (s *fakeServer) handleGetUser(w http.ResponseWriter, r *http.Request) {
 
 func (s *fakeServer) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
-	var users []client.User
+	users := make([]client.User, 0, len(s.users))
 	for _, u := range s.users {
 		users = append(users, u)
 	}
@@ -208,7 +208,7 @@ func (s *fakeServer) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Simple: skip past cursor if set.
-	var result []client.User
+	result := make([]client.User, 0, len(users))
 	pastCursor := cursor == ""
 	for _, u := range users {
 		if !pastCursor {
@@ -344,7 +344,7 @@ func (s *fakeServer) handleGetOrg(w http.ResponseWriter, r *http.Request) {
 
 func (s *fakeServer) handleListOrgs(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
-	var orgs []client.Organization
+	orgs := make([]client.Organization, 0, len(s.orgs))
 	for _, o := range s.orgs {
 		orgs = append(orgs, o)
 	}
@@ -726,7 +726,7 @@ func (s *fakeServer) handleGetOAuthClient(w http.ResponseWriter, r *http.Request
 
 func (s *fakeServer) handleListOAuthClients(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
-	var list []client.OAuthClient
+	list := make([]client.OAuthClient, 0, len(s.clients))
 	for _, oc := range s.clients {
 		list = append(list, oc)
 	}

@@ -238,7 +238,7 @@ func TestKeycloakImporter_DryRun(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v1/users" && r.Method == http.MethodGet {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"users":       []interface{}{},
 				"next_cursor": "",
 			})
@@ -319,34 +319,34 @@ func TestKeycloakImporter_LiveImport(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.URL.Path == "/api/v1/users" && r.Method == http.MethodGet:
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"users":       []interface{}{},
 				"next_cursor": "",
 			})
 		case r.URL.Path == "/api/v1/users" && r.Method == http.MethodPost:
 			var input map[string]interface{}
-			json.NewDecoder(r.Body).Decode(&input)
+			_ = json.NewDecoder(r.Body).Decode(&input)
 			createdUsers = append(createdUsers, input["email"].(string))
 			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(map[string]interface{}{"id": "u1", "email": input["email"]})
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"id": "u1", "email": input["email"]})
 		case r.URL.Path == "/api/v1/orgs" && r.Method == http.MethodPost:
 			var input map[string]interface{}
-			json.NewDecoder(r.Body).Decode(&input)
+			_ = json.NewDecoder(r.Body).Decode(&input)
 			createdOrgs = append(createdOrgs, input["name"].(string))
 			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(map[string]interface{}{"id": "o1", "slug": input["slug"], "name": input["name"]})
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"id": "o1", "slug": input["slug"], "name": input["name"]})
 		case strings.HasSuffix(r.URL.Path, "/roles") && r.Method == http.MethodPost:
 			var input map[string]interface{}
-			json.NewDecoder(r.Body).Decode(&input)
+			_ = json.NewDecoder(r.Body).Decode(&input)
 			createdRoles = append(createdRoles, input["name"].(string))
 			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(map[string]interface{}{"id": "r1", "name": input["name"]})
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"id": "r1", "name": input["name"]})
 		case r.URL.Path == "/api/v1/clients" && r.Method == http.MethodPost:
 			var input map[string]interface{}
-			json.NewDecoder(r.Body).Decode(&input)
+			_ = json.NewDecoder(r.Body).Decode(&input)
 			createdClients = append(createdClients, input["name"].(string))
 			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(map[string]interface{}{"id": input["id"], "name": input["name"]})
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"id": input["id"], "name": input["name"]})
 		default:
 			http.NotFound(w, r)
 		}

@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/Monet/seki/internal/admin"
 	"github.com/Monet/seki/internal/config"
 	"github.com/Monet/seki/internal/crypto"
@@ -20,10 +22,8 @@ import (
 	"github.com/Monet/seki/internal/ratelimit"
 	"github.com/Monet/seki/internal/session"
 	"github.com/Monet/seki/internal/storage"
-	"github.com/Monet/seki/internal/validate"
-	"golang.org/x/crypto/bcrypt"
-
 	_ "github.com/Monet/seki/internal/storage/sqlite"
+	"github.com/Monet/seki/internal/validate"
 )
 
 // ---------------------------------------------------------------------------
@@ -184,7 +184,7 @@ func TestXSS_UserDisplayName(t *testing.T) {
 
 	// The JSON response should contain the payload as a literal string, not executable HTML.
 	var user storage.User
-	json.NewDecoder(rec.Body).Decode(&user)
+	_ = json.NewDecoder(rec.Body).Decode(&user)
 	if !strings.Contains(user.DisplayName, "<script>") {
 		t.Error("display_name should be stored as-is (JSON encoding handles escaping)")
 	}
@@ -208,12 +208,12 @@ func TestErrorResponse_NoStackTraces(t *testing.T) {
 	body := rec.Body.String()
 	// Error response should not contain Go source file references or stack traces.
 	forbidden := []string{
-		".go:",         // source file references
-		"goroutine",   // stack traces
-		"runtime.",    // runtime internals
-		"panic",       // panic messages
-		"internal/",   // internal paths
-		"sql:",        // raw SQL errors
+		".go:",      // source file references
+		"goroutine", // stack traces
+		"runtime.",  // runtime internals
+		"panic",     // panic messages
+		"internal/", // internal paths
+		"sql:",      // raw SQL errors
 	}
 	for _, substr := range forbidden {
 		if strings.Contains(strings.ToLower(body), strings.ToLower(substr)) {
@@ -649,10 +649,10 @@ func TestValidation_Slug(t *testing.T) {
 		{"org123", true},
 		{"ab", true},
 		{"", false},
-		{"A", false},            // too short + uppercase
-		{"-invalid", false},     // starts with hyphen
-		{"invalid-", false},     // ends with hyphen
-		{"ORG", false},          // uppercase
+		{"A", false},                     // too short + uppercase
+		{"-invalid", false},              // starts with hyphen
+		{"invalid-", false},              // ends with hyphen
+		{"ORG", false},                   // uppercase
 		{strings.Repeat("a", 65), false}, // too long
 	}
 
@@ -700,10 +700,10 @@ func TestValidation_Password(t *testing.T) {
 	}{
 		{"securepass", true},
 		{"12345678", true},
-		{"short", false},                             // too short
-		{"", false},                                  // empty
-		{strings.Repeat("a", 129), false},            // too long
-		{strings.Repeat("a", 128), true},             // at limit
+		{"short", false},                  // too short
+		{"", false},                       // empty
+		{strings.Repeat("a", 129), false}, // too long
+		{strings.Repeat("a", 128), true},  // at limit
 	}
 
 	for _, tc := range tests {

@@ -50,13 +50,13 @@ func loadMigrationsFrom(fsys fs.FS, dir string) ([]MigrationEntry, error) {
 	}
 
 	// Build sorted list.
-	var versions []string
+	versions := make([]string, 0, len(upFiles))
 	for v := range upFiles {
 		versions = append(versions, v)
 	}
 	sort.Strings(versions)
 
-	var migrations []MigrationEntry
+	migrations := make([]MigrationEntry, 0, len(versions))
 	for _, ver := range versions {
 		upFile := upFiles[ver]
 		downFile, hasDown := downFiles[ver]

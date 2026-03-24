@@ -183,7 +183,7 @@ func (m *Manager) Cleanup(ctx context.Context) (int64, error) {
 
 // SetCookie writes the session cookie to the response.
 func (m *Manager) SetCookie(w http.ResponseWriter, sess *storage.Session) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- security attributes are configurable via session.Config
 		Name:     m.config.CookieName,
 		Value:    sess.ID,
 		Path:     m.config.CookiePath,
@@ -197,7 +197,7 @@ func (m *Manager) SetCookie(w http.ResponseWriter, sess *storage.Session) {
 
 // ClearCookie removes the session cookie.
 func (m *Manager) ClearCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- security attributes are configurable via session.Config
 		Name:     m.config.CookieName,
 		Value:    "",
 		Path:     m.config.CookiePath,

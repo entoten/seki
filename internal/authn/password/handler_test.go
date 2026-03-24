@@ -128,7 +128,7 @@ func TestHandlerVerify(t *testing.T) {
 	}
 
 	var resp map[string]string
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 	if resp["user_id"] != user.ID {
 		t.Errorf("user_id = %s, want %s", resp["user_id"], user.ID)
 	}

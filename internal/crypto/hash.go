@@ -126,7 +126,11 @@ func (h *Argon2idHasher) Verify(password, hash string) error {
 		return fmt.Errorf("decoding hash: %w", err)
 	}
 
-	keyLen := uint32(len(expectedKey))
+	expectedLen := len(expectedKey)
+	if expectedLen < 0 || expectedLen > int(^uint32(0)) {
+		return errors.New("invalid hash length")
+	}
+	keyLen := uint32(expectedLen) // #nosec G115 -- bounds checked above
 	actualKey := argon2.IDKey([]byte(password), salt, time, memory, threads, keyLen)
 
 	if subtle.ConstantTimeCompare(actualKey, expectedKey) != 1 {

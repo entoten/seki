@@ -106,11 +106,11 @@ func (h *testHarness) doAuthorize(t *testing.T, params url.Values, withCookie bo
 func validParams() url.Values {
 	return url.Values{
 		"client_id":             {"test-client"},
-		"redirect_uri":         {"https://app.example.com/callback"},
-		"response_type":        {"code"},
-		"scope":                {"openid profile"},
-		"state":                {"test-state"},
-		"code_challenge":       {"dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"},
+		"redirect_uri":          {"https://app.example.com/callback"},
+		"response_type":         {"code"},
+		"scope":                 {"openid profile"},
+		"state":                 {"test-state"},
+		"code_challenge":        {"dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"},
 		"code_challenge_method": {"S256"},
 	}
 }
@@ -118,6 +118,7 @@ func validParams() url.Values {
 func TestAuthorize_ValidRequest(t *testing.T) {
 	h := newTestHarness(t)
 	resp := h.doAuthorize(t, validParams(), true)
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusFound {
 		t.Fatalf("expected 302, got %d", resp.StatusCode)
@@ -163,6 +164,7 @@ func TestAuthorize_MissingClientID(t *testing.T) {
 	params := validParams()
 	params.Del("client_id")
 	resp := h.doAuthorize(t, params, true)
+	defer resp.Body.Close()
 
 	// Should render error page (not redirect).
 	if resp.StatusCode != http.StatusBadRequest {
@@ -175,6 +177,7 @@ func TestAuthorize_UnknownClientID(t *testing.T) {
 	params := validParams()
 	params.Set("client_id", "unknown-client")
 	resp := h.doAuthorize(t, params, true)
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
@@ -186,6 +189,7 @@ func TestAuthorize_InvalidRedirectURI(t *testing.T) {
 	params := validParams()
 	params.Set("redirect_uri", "https://evil.example.com/callback")
 	resp := h.doAuthorize(t, params, true)
+	defer resp.Body.Close()
 
 	// Should render error page, NOT redirect to the invalid URI.
 	if resp.StatusCode != http.StatusBadRequest {
@@ -202,6 +206,7 @@ func TestAuthorize_MissingRedirectURI(t *testing.T) {
 	params := validParams()
 	params.Del("redirect_uri")
 	resp := h.doAuthorize(t, params, true)
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
@@ -213,6 +218,7 @@ func TestAuthorize_MissingResponseType(t *testing.T) {
 	params := validParams()
 	params.Del("response_type")
 	resp := h.doAuthorize(t, params, true)
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusFound {
 		t.Fatalf("expected 302, got %d", resp.StatusCode)
@@ -228,6 +234,7 @@ func TestAuthorize_UnsupportedResponseType(t *testing.T) {
 	params := validParams()
 	params.Set("response_type", "token")
 	resp := h.doAuthorize(t, params, true)
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusFound {
 		t.Fatalf("expected 302, got %d", resp.StatusCode)
@@ -243,6 +250,7 @@ func TestAuthorize_MissingScopeOpenID(t *testing.T) {
 	params := validParams()
 	params.Set("scope", "profile email")
 	resp := h.doAuthorize(t, params, true)
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusFound {
 		t.Fatalf("expected 302, got %d", resp.StatusCode)
@@ -259,6 +267,7 @@ func TestAuthorize_MissingCodeChallenge(t *testing.T) {
 	params.Del("code_challenge")
 	params.Del("code_challenge_method")
 	resp := h.doAuthorize(t, params, true)
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusFound {
 		t.Fatalf("expected 302, got %d", resp.StatusCode)
@@ -274,6 +283,7 @@ func TestAuthorize_InvalidCodeChallengeMethod(t *testing.T) {
 	params := validParams()
 	params.Set("code_challenge_method", "plain")
 	resp := h.doAuthorize(t, params, true)
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusFound {
 		t.Fatalf("expected 302, got %d", resp.StatusCode)
@@ -287,6 +297,7 @@ func TestAuthorize_InvalidCodeChallengeMethod(t *testing.T) {
 func TestAuthorize_NoSession(t *testing.T) {
 	h := newTestHarness(t)
 	resp := h.doAuthorize(t, validParams(), false)
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusFound {
 		t.Fatalf("expected 302, got %d", resp.StatusCode)
@@ -304,6 +315,7 @@ func TestAuthorize_NoSession(t *testing.T) {
 func TestAuthorize_AuthCodeExpiry(t *testing.T) {
 	h := newTestHarness(t)
 	resp := h.doAuthorize(t, validParams(), true)
+	defer resp.Body.Close()
 
 	loc, _ := resp.Location()
 	code := loc.Query().Get("code")
@@ -327,6 +339,7 @@ func TestAuthorize_StatePreserved(t *testing.T) {
 	params := validParams()
 	params.Set("state", "my-unique-state-123")
 	resp := h.doAuthorize(t, params, true)
+	defer resp.Body.Close()
 
 	loc, _ := resp.Location()
 	if loc.Query().Get("state") != "my-unique-state-123" {
@@ -339,6 +352,7 @@ func TestAuthorize_NoStateOmitted(t *testing.T) {
 	params := validParams()
 	params.Del("state")
 	resp := h.doAuthorize(t, params, true)
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusFound {
 		t.Fatalf("expected 302, got %d", resp.StatusCode)
@@ -357,6 +371,7 @@ func TestAuthorize_NoStateOmitted(t *testing.T) {
 func TestAuthorize_CodeStoredAndRetrievable(t *testing.T) {
 	h := newTestHarness(t)
 	resp := h.doAuthorize(t, validParams(), true)
+	defer resp.Body.Close()
 
 	loc, _ := resp.Location()
 	code := loc.Query().Get("code")
