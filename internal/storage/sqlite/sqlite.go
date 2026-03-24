@@ -69,9 +69,9 @@ func (s *Store) CreateUser(ctx context.Context, user *storage.User) error {
 	meta := normalizeJSON(user.Metadata)
 	now := timeStr(user.CreatedAt)
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO users (id, email, display_name, disabled, metadata, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		user.ID, user.Email, user.DisplayName, boolToInt(user.Disabled), meta, now, now,
+		`INSERT INTO users (id, email, display_name, disabled, email_verified, metadata, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		user.ID, user.Email, user.DisplayName, boolToInt(user.Disabled), boolToInt(user.EmailVerified), meta, now, now,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -84,14 +84,14 @@ func (s *Store) CreateUser(ctx context.Context, user *storage.User) error {
 
 func (s *Store) GetUser(ctx context.Context, id string) (*storage.User, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, email, display_name, disabled, metadata, created_at, updated_at
+		`SELECT id, email, display_name, disabled, email_verified, metadata, created_at, updated_at
 		 FROM users WHERE id = ?`, id)
 	return scanUser(row)
 }
 
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (*storage.User, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, email, display_name, disabled, metadata, created_at, updated_at
+		`SELECT id, email, display_name, disabled, email_verified, metadata, created_at, updated_at
 		 FROM users WHERE email = ?`, email)
 	return scanUser(row)
 }
@@ -100,9 +100,9 @@ func (s *Store) UpdateUser(ctx context.Context, user *storage.User) error {
 	meta := normalizeJSON(user.Metadata)
 	now := timeStr(time.Now().UTC())
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE users SET email = ?, display_name = ?, disabled = ?, metadata = ?, updated_at = ?
+		`UPDATE users SET email = ?, display_name = ?, disabled = ?, email_verified = ?, metadata = ?, updated_at = ?
 		 WHERE id = ?`,
-		user.Email, user.DisplayName, boolToInt(user.Disabled), meta, now, user.ID,
+		user.Email, user.DisplayName, boolToInt(user.Disabled), boolToInt(user.EmailVerified), meta, now, user.ID,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -130,13 +130,13 @@ func (s *Store) ListUsers(ctx context.Context, opts storage.ListOptions) ([]*sto
 	var err error
 	if opts.Cursor != "" {
 		rows, err = s.db.QueryContext(ctx,
-			`SELECT id, email, display_name, disabled, metadata, created_at, updated_at
+			`SELECT id, email, display_name, disabled, email_verified, metadata, created_at, updated_at
 			 FROM users WHERE id > ? ORDER BY id ASC LIMIT ?`,
 			opts.Cursor, limit+1,
 		)
 	} else {
 		rows, err = s.db.QueryContext(ctx,
-			`SELECT id, email, display_name, disabled, metadata, created_at, updated_at
+			`SELECT id, email, display_name, disabled, email_verified, metadata, created_at, updated_at
 			 FROM users ORDER BY id ASC LIMIT ?`,
 			limit+1,
 		)
@@ -327,6 +327,14 @@ func (s *Store) ListAuditLogs(ctx context.Context, opts storage.AuditListOptions
 	if opts.Action != "" {
 		query += ` AND action = ?`
 		args = append(args, opts.Action)
+	}
+	if !opts.From.IsZero() {
+		query += ` AND created_at >= ?`
+		args = append(args, timeStr(opts.From))
+	}
+	if !opts.To.IsZero() {
+		query += ` AND created_at < ?`
+		args = append(args, timeStr(opts.To))
 	}
 	if opts.Cursor != "" {
 		query += ` AND id > ?`
@@ -937,10 +945,10 @@ type scanner interface {
 
 func scanUser(row scanner) (*storage.User, error) {
 	var u storage.User
-	var disabled int
+	var disabled, emailVerified int
 	var meta string
 	var createdAt, updatedAt string
-	err := row.Scan(&u.ID, &u.Email, &u.DisplayName, &disabled, &meta, &createdAt, &updatedAt)
+	err := row.Scan(&u.ID, &u.Email, &u.DisplayName, &disabled, &emailVerified, &meta, &createdAt, &updatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, storage.ErrNotFound
@@ -948,6 +956,7 @@ func scanUser(row scanner) (*storage.User, error) {
 		return nil, fmt.Errorf("sqlite: scan user: %w", err)
 	}
 	u.Disabled = disabled != 0
+	u.EmailVerified = emailVerified != 0
 	u.Metadata = json.RawMessage(meta)
 	u.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 	u.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
@@ -1061,4 +1070,68 @@ func checkRowsAffected(res sql.Result, entity string) error {
 		return storage.ErrNotFound
 	}
 	return nil
+}
+
+// ---------------------------------------------------------------------------
+// VerificationTokenStore
+// ---------------------------------------------------------------------------
+
+func (s *Store) CreateVerificationToken(ctx context.Context, token *storage.VerificationToken) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO verification_tokens (id, user_id, type, token_hash, expires_at, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		token.ID, token.UserID, token.Type, token.TokenHash,
+		timeStr(token.ExpiresAt), timeStr(token.CreatedAt),
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("sqlite: create verification token: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetVerificationTokenByHash(ctx context.Context, hash string) (*storage.VerificationToken, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, user_id, type, token_hash, expires_at, created_at, used_at
+		 FROM verification_tokens WHERE token_hash = ?`, hash)
+	var t storage.VerificationToken
+	var expiresAt, createdAt string
+	var usedAt sql.NullString
+	err := row.Scan(&t.ID, &t.UserID, &t.Type, &t.TokenHash, &expiresAt, &createdAt, &usedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("sqlite: get verification token: %w", err)
+	}
+	t.ExpiresAt, _ = time.Parse(time.RFC3339, expiresAt)
+	t.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	if usedAt.Valid {
+		parsed, _ := time.Parse(time.RFC3339, usedAt.String)
+		t.UsedAt = &parsed
+	}
+	return &t, nil
+}
+
+func (s *Store) MarkTokenUsed(ctx context.Context, id string) error {
+	now := timeStr(time.Now().UTC())
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE verification_tokens SET used_at = ? WHERE id = ?`, now, id)
+	if err != nil {
+		return fmt.Errorf("sqlite: mark token used: %w", err)
+	}
+	return checkRowsAffected(res, "verification_token")
+}
+
+func (s *Store) DeleteExpiredTokens(ctx context.Context) (int64, error) {
+	now := timeStr(time.Now().UTC())
+	res, err := s.db.ExecContext(ctx,
+		`DELETE FROM verification_tokens WHERE expires_at < ? AND used_at IS NULL`, now)
+	if err != nil {
+		return 0, fmt.Errorf("sqlite: delete expired tokens: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
 }

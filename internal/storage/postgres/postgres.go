@@ -46,6 +46,7 @@ func (s *Store) Migrate() error {
 		"migrations/003_refresh_tokens.up.sql",
 		"migrations/004_credentials_webauthn.up.sql",
 		"migrations/005_organizations.up.sql",
+		"migrations/006_verification_tokens.up.sql",
 	}
 	for _, name := range migrations {
 		data, err := migrationsFS.ReadFile(name)
@@ -78,9 +79,9 @@ func (s *Store) CreateUser(ctx context.Context, user *storage.User) error {
 	meta := normalizeJSON(user.Metadata)
 	now := user.CreatedAt.UTC()
 	_, err := s.pool.Exec(ctx,
-		`INSERT INTO users (id, email, display_name, disabled, metadata, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		user.ID, user.Email, user.DisplayName, user.Disabled, meta, now, now,
+		`INSERT INTO users (id, email, display_name, disabled, email_verified, metadata, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		user.ID, user.Email, user.DisplayName, user.Disabled, user.EmailVerified, meta, now, now,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -93,14 +94,14 @@ func (s *Store) CreateUser(ctx context.Context, user *storage.User) error {
 
 func (s *Store) GetUser(ctx context.Context, id string) (*storage.User, error) {
 	row := s.pool.QueryRow(ctx,
-		`SELECT id, email, display_name, disabled, metadata, created_at, updated_at
+		`SELECT id, email, display_name, disabled, email_verified, metadata, created_at, updated_at
 		 FROM users WHERE id = $1`, id)
 	return scanUser(row)
 }
 
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (*storage.User, error) {
 	row := s.pool.QueryRow(ctx,
-		`SELECT id, email, display_name, disabled, metadata, created_at, updated_at
+		`SELECT id, email, display_name, disabled, email_verified, metadata, created_at, updated_at
 		 FROM users WHERE email = $1`, email)
 	return scanUser(row)
 }
@@ -109,9 +110,9 @@ func (s *Store) UpdateUser(ctx context.Context, user *storage.User) error {
 	meta := normalizeJSON(user.Metadata)
 	now := time.Now().UTC()
 	ct, err := s.pool.Exec(ctx,
-		`UPDATE users SET email = $1, display_name = $2, disabled = $3, metadata = $4, updated_at = $5
-		 WHERE id = $6`,
-		user.Email, user.DisplayName, user.Disabled, meta, now, user.ID,
+		`UPDATE users SET email = $1, display_name = $2, disabled = $3, email_verified = $4, metadata = $5, updated_at = $6
+		 WHERE id = $7`,
+		user.Email, user.DisplayName, user.Disabled, user.EmailVerified, meta, now, user.ID,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -145,13 +146,13 @@ func (s *Store) ListUsers(ctx context.Context, opts storage.ListOptions) ([]*sto
 	var err error
 	if opts.Cursor != "" {
 		rows, err = s.pool.Query(ctx,
-			`SELECT id, email, display_name, disabled, metadata, created_at, updated_at
+			`SELECT id, email, display_name, disabled, email_verified, metadata, created_at, updated_at
 			 FROM users WHERE id > $1 ORDER BY id ASC LIMIT $2`,
 			opts.Cursor, limit+1,
 		)
 	} else {
 		rows, err = s.pool.Query(ctx,
-			`SELECT id, email, display_name, disabled, metadata, created_at, updated_at
+			`SELECT id, email, display_name, disabled, email_verified, metadata, created_at, updated_at
 			 FROM users ORDER BY id ASC LIMIT $1`,
 			limit+1,
 		)
@@ -983,7 +984,7 @@ func scanCredentialPgx(row pgx.Row) (*storage.Credential, error) {
 func scanUser(row pgx.Row) (*storage.User, error) {
 	var u storage.User
 	var meta []byte
-	err := row.Scan(&u.ID, &u.Email, &u.DisplayName, &u.Disabled, &meta, &u.CreatedAt, &u.UpdatedAt)
+	err := row.Scan(&u.ID, &u.Email, &u.DisplayName, &u.Disabled, &u.EmailVerified, &meta, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, storage.ErrNotFound
@@ -997,7 +998,7 @@ func scanUser(row pgx.Row) (*storage.User, error) {
 func scanUserPgx(rows pgx.Rows) (*storage.User, error) {
 	var u storage.User
 	var meta []byte
-	err := rows.Scan(&u.ID, &u.Email, &u.DisplayName, &u.Disabled, &meta, &u.CreatedAt, &u.UpdatedAt)
+	err := rows.Scan(&u.ID, &u.Email, &u.DisplayName, &u.Disabled, &u.EmailVerified, &meta, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: scan user: %w", err)
 	}
@@ -1049,4 +1050,62 @@ func isUniqueViolation(err error) bool {
 		return pgErr.Code == "23505" // unique_violation
 	}
 	return false
+}
+
+// ---------------------------------------------------------------------------
+// VerificationTokenStore
+// ---------------------------------------------------------------------------
+
+func (s *Store) CreateVerificationToken(ctx context.Context, token *storage.VerificationToken) error {
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO verification_tokens (id, user_id, type, token_hash, expires_at, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6)`,
+		token.ID, token.UserID, token.Type, token.TokenHash,
+		token.ExpiresAt.UTC(), token.CreatedAt.UTC(),
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("postgres: create verification token: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetVerificationTokenByHash(ctx context.Context, hash string) (*storage.VerificationToken, error) {
+	row := s.pool.QueryRow(ctx,
+		`SELECT id, user_id, type, token_hash, expires_at, created_at, used_at
+		 FROM verification_tokens WHERE token_hash = $1`, hash)
+	var t storage.VerificationToken
+	err := row.Scan(&t.ID, &t.UserID, &t.Type, &t.TokenHash, &t.ExpiresAt, &t.CreatedAt, &t.UsedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("postgres: get verification token: %w", err)
+	}
+	return &t, nil
+}
+
+func (s *Store) MarkTokenUsed(ctx context.Context, id string) error {
+	now := time.Now().UTC()
+	ct, err := s.pool.Exec(ctx,
+		`UPDATE verification_tokens SET used_at = $1 WHERE id = $2`, now, id)
+	if err != nil {
+		return fmt.Errorf("postgres: mark token used: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DeleteExpiredTokens(ctx context.Context) (int64, error) {
+	now := time.Now().UTC()
+	ct, err := s.pool.Exec(ctx,
+		`DELETE FROM verification_tokens WHERE expires_at < $1 AND used_at IS NULL`, now)
+	if err != nil {
+		return 0, fmt.Errorf("postgres: delete expired tokens: %w", err)
+	}
+	return ct.RowsAffected(), nil
 }

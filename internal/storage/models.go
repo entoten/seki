@@ -7,13 +7,25 @@ import (
 
 // User represents a registered user.
 type User struct {
-	ID          string          `json:"id"`
-	Email       string          `json:"email"`
-	DisplayName string          `json:"display_name"`
-	Disabled    bool            `json:"disabled"`
-	Metadata    json.RawMessage `json:"metadata"`
-	CreatedAt   time.Time       `json:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at"`
+	ID            string          `json:"id"`
+	Email         string          `json:"email"`
+	DisplayName   string          `json:"display_name"`
+	Disabled      bool            `json:"disabled"`
+	EmailVerified bool            `json:"email_verified"`
+	Metadata      json.RawMessage `json:"metadata"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
+}
+
+// VerificationToken represents a token for email verification or password reset.
+type VerificationToken struct {
+	ID        string     `json:"id"`
+	UserID    string     `json:"user_id"`
+	Type      string     `json:"type"` // "email_verification" or "password_reset"
+	TokenHash string     `json:"token_hash"`
+	ExpiresAt time.Time  `json:"expires_at"`
+	CreatedAt time.Time  `json:"created_at"`
+	UsedAt    *time.Time `json:"used_at,omitempty"`
 }
 
 // Client represents an OAuth2/OIDC client application.
@@ -110,10 +122,12 @@ type Credential struct {
 
 // AuditListOptions controls cursor-based pagination and filtering for audit logs.
 type AuditListOptions struct {
-	Cursor   string // opaque cursor (audit entry ID for keyset pagination)
+	Cursor   string    // opaque cursor (audit entry ID for keyset pagination)
 	Limit    int
-	ActorID  string // optional filter
-	Action   string // optional filter
+	ActorID  string    // optional filter
+	Action   string    // optional filter
+	From     time.Time // optional: only entries created at or after this time
+	To       time.Time // optional: only entries created before this time
 }
 
 // Organization represents a tenant/organization.

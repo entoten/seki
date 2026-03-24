@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"io/fs"
 	"net"
 	"net/http"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/Monet/seki/internal/session"
 	"github.com/Monet/seki/internal/storage"
 	"github.com/Monet/seki/internal/webhook"
+	adminui "github.com/Monet/seki/web/admin"
 )
 
 // Server wraps the HTTP server and its dependencies.
@@ -118,6 +120,11 @@ func (s *Server) registerRoutes() {
 		adminHandler := admin.NewHandler(s.store, s.cfg.Admin.APIKeys...)
 		adminHandler.RegisterRoutes(s.mux)
 	}
+
+	// Admin UI (embedded SPA).
+	adminFS, _ := fs.Sub(adminui.FS, ".")
+	s.mux.Handle("GET /admin", http.RedirectHandler("/admin/", http.StatusMovedPermanently))
+	s.mux.Handle("GET /admin/", http.StripPrefix("/admin/", http.FileServer(http.FS(adminFS))))
 
 	// Authentication method routes.
 	s.registerAuthnRoutes()

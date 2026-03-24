@@ -23,6 +23,7 @@ type Storage interface {
 	CredentialStore
 	OrgStore
 	RoleStore
+	VerificationTokenStore
 	Migrate() error
 	Close() error
 	Ping(ctx context.Context) error
@@ -115,4 +116,12 @@ type RoleStore interface {
 	ListRoles(ctx context.Context, orgID string) ([]*Role, error)
 	UpdateRole(ctx context.Context, role *Role) error
 	DeleteRole(ctx context.Context, id string) error
+}
+
+// VerificationTokenStore defines operations on verification tokens.
+type VerificationTokenStore interface {
+	CreateVerificationToken(ctx context.Context, token *VerificationToken) error
+	GetVerificationTokenByHash(ctx context.Context, hash string) (*VerificationToken, error)
+	MarkTokenUsed(ctx context.Context, id string) error
+	DeleteExpiredTokens(ctx context.Context) (int64, error)
 }
