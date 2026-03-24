@@ -10,6 +10,31 @@ type Config struct {
 	Authentication AuthenticationConfig  `yaml:"authentication"`
 	Audit          AuditConfig           `yaml:"audit"`
 	Webhooks       WebhooksConfig        `yaml:"webhooks"`
+	Admin          AdminConfig           `yaml:"admin"`
+	RateLimit      RateLimitConfig       `yaml:"rate_limit"`
+	CORS           CORSConfig            `yaml:"cors"`
+}
+
+// RateLimitConfig holds rate limiting and brute-force protection settings.
+type RateLimitConfig struct {
+	Enabled          bool   `yaml:"enabled"`
+	RequestsPerMin   int    `yaml:"requests_per_min"`
+	LoginAttemptsMax int    `yaml:"login_attempts_max"`
+	LockoutDuration  string `yaml:"lockout_duration"`
+}
+
+// CORSConfig holds Cross-Origin Resource Sharing settings.
+type CORSConfig struct {
+	AllowedOrigins   []string `yaml:"allowed_origins"`   // e.g. ["https://app.example.com"]
+	AllowedMethods   []string `yaml:"allowed_methods"`   // default: GET, POST, PATCH, DELETE, OPTIONS
+	AllowedHeaders   []string `yaml:"allowed_headers"`   // default: Authorization, Content-Type, X-API-Key
+	AllowCredentials bool     `yaml:"allow_credentials"` // default: true
+	MaxAge           int      `yaml:"max_age"`           // preflight cache seconds, default: 3600
+}
+
+// AdminConfig holds settings for the Admin REST API.
+type AdminConfig struct {
+	APIKeys []string `yaml:"api_keys"`
 }
 
 // ServerConfig holds HTTP server settings.
@@ -108,6 +133,7 @@ type WebhooksConfig struct {
 
 // WebhookEndpointConfig holds a single webhook endpoint.
 type WebhookEndpointConfig struct {
-	URL    string `yaml:"url"`
-	Secret string `yaml:"secret"`
+	URL    string   `yaml:"url"`
+	Secret string   `yaml:"secret"`
+	Events []string `yaml:"events"` // event filter; empty means all events
 }

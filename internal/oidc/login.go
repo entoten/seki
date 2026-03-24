@@ -1,9 +1,12 @@
 package oidc
 
 import (
+	"encoding/json"
 	"html/template"
+	"net"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/Monet/seki/internal/config"
 	"github.com/Monet/seki/web/login"
@@ -65,9 +68,27 @@ func (p *Provider) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check brute-force lockout before attempting authentication.
+	ip := loginClientIP(r)
+	if p.limiter != nil && p.limiter.IsLocked(ip, email) {
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.Header().Set("Retry-After", "60")
+		w.WriteHeader(http.StatusTooManyRequests)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"type":   "urn:ietf:rfc:6585#too-many-requests",
+			"title":  "Too Many Requests",
+			"status": http.StatusTooManyRequests,
+			"detail": "Account temporarily locked due to too many failed login attempts. Please try again later.",
+		})
+		return
+	}
+
 	// Look up user by email.
 	user, err := p.store.GetUserByEmail(r.Context(), email)
 	if err != nil {
+		if p.limiter != nil {
+			p.limiter.RecordLoginFailure(ip, email)
+		}
 		p.renderLoginError(w, r, "Invalid email or password.")
 		return
 	}
@@ -75,16 +96,45 @@ func (p *Provider) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 	// Verify password credential.
 	creds, err := p.store.GetCredentialsByUserAndType(r.Context(), user.ID, "password")
 	if err != nil || len(creds) == 0 {
+		if p.limiter != nil {
+			p.limiter.RecordLoginFailure(ip, email)
+		}
 		p.renderLoginError(w, r, "Invalid email or password.")
 		return
 	}
 
 	if !checkPasswordHash(password, creds[0].Secret) {
+		if p.limiter != nil {
+			p.limiter.RecordLoginFailure(ip, email)
+		}
 		p.renderLoginError(w, r, "Invalid email or password.")
 		return
 	}
 
+	// Login successful — reset failure counter.
+	if p.limiter != nil {
+		p.limiter.RecordLoginSuccess(ip, email)
+	}
+
 	p.completeLogin(w, r, user.ID)
+}
+
+// loginClientIP extracts the client IP from the request for login tracking.
+func loginClientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if idx := strings.IndexByte(xff, ','); idx != -1 {
+			return strings.TrimSpace(xff[:idx])
+		}
+		return strings.TrimSpace(xff)
+	}
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 // handleLogout destroys the session and clears the cookie (POST /logout).

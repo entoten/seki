@@ -5,6 +5,7 @@ import (
 
 	"github.com/Monet/seki/internal/config"
 	"github.com/Monet/seki/internal/crypto"
+	"github.com/Monet/seki/internal/ratelimit"
 	"github.com/Monet/seki/internal/session"
 	"github.com/Monet/seki/internal/storage"
 )
@@ -16,6 +17,7 @@ type Provider struct {
 	store       storage.Storage
 	sessions    *session.Manager
 	authnConfig config.AuthenticationConfig
+	limiter     *ratelimit.Limiter
 }
 
 // NewProvider creates a new OIDC Provider.
@@ -45,6 +47,13 @@ func WithSessionManager(mgr *session.Manager) ProviderOption {
 func WithAuthenticationConfig(cfg config.AuthenticationConfig) ProviderOption {
 	return func(p *Provider) {
 		p.authnConfig = cfg
+	}
+}
+
+// WithRateLimiter sets the rate limiter on the provider for login brute-force protection.
+func WithRateLimiter(l *ratelimit.Limiter) ProviderOption {
+	return func(p *Provider) {
+		p.limiter = l
 	}
 }
 

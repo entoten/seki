@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/Monet/seki/internal/admin"
 	"github.com/Monet/seki/internal/audit"
 	"github.com/Monet/seki/internal/authn/passkey"
@@ -15,7 +17,10 @@ import (
 	"github.com/Monet/seki/internal/authn/totp"
 	"github.com/Monet/seki/internal/config"
 	"github.com/Monet/seki/internal/crypto"
+	"github.com/Monet/seki/internal/metrics"
+	"github.com/Monet/seki/internal/middleware"
 	"github.com/Monet/seki/internal/oidc"
+	"github.com/Monet/seki/internal/ratelimit"
 	"github.com/Monet/seki/internal/session"
 	"github.com/Monet/seki/internal/storage"
 	"github.com/Monet/seki/internal/webhook"
@@ -29,6 +34,7 @@ type Server struct {
 	sessions *session.Manager
 	audit    *audit.Logger
 	webhooks *webhook.Emitter
+	limiter  *ratelimit.Limiter
 	mux      *http.ServeMux
 	server   *http.Server
 }
@@ -46,6 +52,24 @@ func New(cfg *config.Config, store storage.Storage, signer crypto.Signer) *Serve
 	// Webhook emitter.
 	webhookEmitter := webhook.NewEmitter(cfg.Webhooks)
 
+	// Register Prometheus metrics.
+	metrics.Register()
+
+	// Rate limiter (optional).
+	var limiter *ratelimit.Limiter
+	if cfg.RateLimit.Enabled {
+		limiter = ratelimit.NewLimiter(cfg.RateLimit)
+	}
+
+	// Build middleware chain: SecurityHeaders -> CORS -> RateLimit -> Metrics -> Router
+	var handler http.Handler = mux
+	handler = metrics.Middleware(handler)
+	if limiter != nil {
+		handler = ratelimit.HTTPMiddleware(limiter)(handler)
+	}
+	handler = middleware.CORS(cfg.CORS)(handler)
+	handler = middleware.SecurityHeaders()(handler)
+
 	s := &Server{
 		cfg:      cfg,
 		store:    store,
@@ -53,10 +77,11 @@ func New(cfg *config.Config, store storage.Storage, signer crypto.Signer) *Serve
 		sessions: sessMgr,
 		audit:    auditLogger,
 		webhooks: webhookEmitter,
+		limiter:  limiter,
 		mux:      mux,
 		server: &http.Server{
 			Addr:              cfg.Server.Address,
-			Handler:           mux,
+			Handler:           handler,
 			ReadHeaderTimeout: 10 * time.Second,
 		},
 	}
@@ -69,13 +94,22 @@ func (s *Server) registerRoutes() {
 	// Health check.
 	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
 
-	// OIDC provider with session manager and authentication config.
+	// Prometheus metrics.
+	s.mux.Handle("GET /metrics", promhttp.Handler())
+
+	// OIDC provider with session manager, authentication config, and rate limiter.
+	providerOpts := []oidc.ProviderOption{
+		oidc.WithSessionManager(s.sessions),
+		oidc.WithAuthenticationConfig(s.cfg.Authentication),
+	}
+	if s.limiter != nil {
+		providerOpts = append(providerOpts, oidc.WithRateLimiter(s.limiter))
+	}
 	provider := oidc.NewProvider(
 		s.cfg.Server.Issuer,
 		s.signer,
 		s.store,
-		oidc.WithSessionManager(s.sessions),
-		oidc.WithAuthenticationConfig(s.cfg.Authentication),
+		providerOpts...,
 	)
 	provider.RegisterRoutes(s.mux)
 
@@ -153,6 +187,9 @@ func (s *Server) Addr() net.Addr {
 
 // Shutdown gracefully shuts down the server.
 func (s *Server) Shutdown(ctx context.Context) error {
+	if s.limiter != nil {
+		s.limiter.Stop()
+	}
 	return s.server.Shutdown(ctx)
 }
 
