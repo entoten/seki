@@ -48,8 +48,15 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	h.registerImpersonateRoutesOn(api)
 	h.registerMAURoutesOn(api)
 
+	// Import routes are registered on a separate mux with a larger body
+	// limit so bulk imports (up to 50 MiB) are not rejected by the
+	// default 64 KiB limit applied to all other admin routes.
+	importMux := http.NewServeMux()
+	h.registerImportRoutesOn(importMux)
+
 	// Wrap with authentication + body size limit and mount on the outer mux.
 	authMiddleware := RequireAPIKey(h.apiKeys)
+	mux.Handle("/api/v1/import/", authMiddleware(importMux))
 	mux.Handle("/api/v1/", authMiddleware(limitRequestBody(api)))
 }
 

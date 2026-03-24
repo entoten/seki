@@ -1,4 +1,4 @@
-// seki-migrate imports users, clients, and roles from Auth0 or Keycloak into seki.
+// seki-migrate imports users, clients, and roles from Auth0, Keycloak, Okta, or Clerk into seki.
 package main
 
 import (
@@ -17,6 +17,8 @@ const usage = `Usage: seki-migrate <source> [options]
 Sources:
   auth0      Import from Auth0 export
   keycloak   Import from Keycloak realm export
+  okta       Import from Okta Management API export
+  clerk      Import from Clerk Backend API export
 
 Options:
   --file FILE        Export file path (JSON)
@@ -99,7 +101,7 @@ func run(args []string) int {
 	}
 
 	if source == "" {
-		fmt.Fprintln(os.Stderr, "error: source is required (auth0 or keycloak)")
+		fmt.Fprintln(os.Stderr, "error: source is required (auth0, keycloak, okta, or clerk)")
 		fmt.Fprint(os.Stderr, usage)
 		return 1
 	}
@@ -141,8 +143,24 @@ func run(args []string) int {
 		}
 		importer = migrate.NewKeycloakImporter(export, cfg, os.Stdout)
 
+	case "okta":
+		export, err := migrate.ParseOktaExport(filePath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error parsing Okta export: %v\n", err)
+			return 1
+		}
+		importer = migrate.NewOktaImporter(export, cfg, os.Stdout)
+
+	case "clerk":
+		export, err := migrate.ParseClerkExport(filePath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error parsing Clerk export: %v\n", err)
+			return 1
+		}
+		importer = migrate.NewClerkImporter(export, cfg, os.Stdout)
+
 	default:
-		fmt.Fprintf(os.Stderr, "unknown source: %s (expected auth0 or keycloak)\n", source)
+		fmt.Fprintf(os.Stderr, "unknown source: %s (expected auth0, keycloak, okta, or clerk)\n", source)
 		return 1
 	}
 
