@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/oidc"
-	"github.com/Monet/seki/internal/session"
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/oidc"
+	"github.com/entoten/seki/internal/session"
+	"github.com/entoten/seki/internal/storage"
 
-	_ "github.com/Monet/seki/internal/storage/sqlite"
+	_ "github.com/entoten/seki/internal/storage/sqlite"
 )
 
 // stepUpHarness extends the test harness with MFA-specific helpers.

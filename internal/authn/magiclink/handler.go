@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/Monet/seki/internal/session"
+	"github.com/entoten/seki/internal/session"
 )
 
 // oidcParamKeys are the OIDC authorization parameters to preserve through the login flow.

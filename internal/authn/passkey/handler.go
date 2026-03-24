@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Monet/seki/internal/session"
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/session"
+	"github.com/entoten/seki/internal/storage"
 )
 
 // Handler serves the WebAuthn HTTP endpoints for passkey registration and login.

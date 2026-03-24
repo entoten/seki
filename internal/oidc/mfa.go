@@ -11,8 +11,8 @@ import (
 
 	"github.com/pquerna/otp/totp"
 
-	"github.com/Monet/seki/internal/storage"
-	"github.com/Monet/seki/web/login"
+	"github.com/entoten/seki/internal/storage"
+	"github.com/entoten/seki/web/login"
 )
 
 // sessionMFAMeta is the structure stored in session.Metadata for MFA state.

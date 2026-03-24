@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Monet/seki/internal/audit"
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/audit"
+	"github.com/entoten/seki/internal/storage"
 )
 
 // impersonateResponse is the JSON body returned by POST /api/v1/users/{id}/impersonate.

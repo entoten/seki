@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Monet/seki/internal/crypto"
-	"github.com/Monet/seki/internal/oidc"
+	"github.com/entoten/seki/internal/crypto"
+	"github.com/entoten/seki/internal/oidc"
 )
 
 func newTestSigner(t *testing.T) crypto.Signer {

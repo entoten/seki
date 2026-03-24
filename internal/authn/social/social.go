@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/storage"
 )
 
 // Well-known OAuth2 endpoints for supported providers.

@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Monet/seki/internal/storage"
-	"github.com/Monet/seki/internal/webhook"
+	"github.com/entoten/seki/internal/storage"
+	"github.com/entoten/seki/internal/webhook"
 )
 
 const (

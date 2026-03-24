@@ -12,7 +12,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Monet/seki/pkg/client"
+	"github.com/entoten/seki/pkg/client"
 )
 
 // runVersion prints the CLI version.

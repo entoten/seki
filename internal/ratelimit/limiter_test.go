@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Monet/seki/internal/config"
+	"github.com/entoten/seki/internal/config"
 )
 
 func newTestLimiter(rpm, maxAttempts int, lockout time.Duration) *Limiter {

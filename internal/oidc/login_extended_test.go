@@ -12,12 +12,12 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/oidc"
-	"github.com/Monet/seki/internal/ratelimit"
-	"github.com/Monet/seki/internal/session"
-	"github.com/Monet/seki/internal/storage"
-	_ "github.com/Monet/seki/internal/storage/sqlite"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/oidc"
+	"github.com/entoten/seki/internal/ratelimit"
+	"github.com/entoten/seki/internal/session"
+	"github.com/entoten/seki/internal/storage"
+	_ "github.com/entoten/seki/internal/storage/sqlite"
 )
 
 func TestPasswordLogin_PasswordNotEnabled(t *testing.T) {

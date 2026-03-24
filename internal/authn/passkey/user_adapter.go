@@ -3,7 +3,7 @@ package passkey
 import (
 	"github.com/go-webauthn/webauthn/webauthn"
 
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/storage"
 )
 
 // UserAdapter wraps a storage.User and its credentials to satisfy the

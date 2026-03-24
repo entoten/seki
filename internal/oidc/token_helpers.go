@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/storage"
 )
 
 // generateAccessToken creates a signed JWT access token.

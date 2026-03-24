@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/storage"
 )
 
 func TestUserToSCIM(t *testing.T) {

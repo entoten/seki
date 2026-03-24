@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/Monet/seki/internal/config"
+	"github.com/entoten/seki/internal/config"
 )
 
 func TestGetAuthURL_Google(t *testing.T) {

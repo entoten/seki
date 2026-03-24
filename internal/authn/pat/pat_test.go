@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Monet/seki/internal/authn/pat"
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/authn/pat"
+	"github.com/entoten/seki/internal/storage"
 
-	_ "github.com/Monet/seki/internal/storage/sqlite"
+	_ "github.com/entoten/seki/internal/storage/sqlite"
 )
 
 func setupStore(t *testing.T) storage.Storage {

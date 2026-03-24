@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Monet/seki/pkg/client"
+	"github.com/entoten/seki/pkg/client"
 )
 
 // Auth0User represents a single user record from an Auth0 Management API export.

@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Monet/seki/internal/metrics"
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/metrics"
+	"github.com/entoten/seki/internal/storage"
 )
 
 // registerMAURoutesOn registers MAU metrics API routes on the given mux.

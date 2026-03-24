@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/storage"
 )
 
 // handleUserInfo serves the OIDC UserInfo endpoint (GET /userinfo).

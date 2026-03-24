@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/webhook"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/webhook"
 )
 
 func TestEmitSendsToEndpoint(t *testing.T) {

@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Monet/seki/internal/session"
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/session"
+	"github.com/entoten/seki/internal/storage"
 
-	_ "github.com/Monet/seki/internal/storage/sqlite"
+	_ "github.com/entoten/seki/internal/storage/sqlite"
 )
 
 func newTestManager(t *testing.T, cfg session.Config) (*session.Manager, storage.Storage) {

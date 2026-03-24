@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/oidc"
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/oidc"
+	"github.com/entoten/seki/internal/storage"
 
-	_ "github.com/Monet/seki/internal/storage/sqlite"
+	_ "github.com/entoten/seki/internal/storage/sqlite"
 )
 
 func TestSeedClientsFromConfig_CreatesClients(t *testing.T) {

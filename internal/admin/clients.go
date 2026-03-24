@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Monet/seki/internal/storage"
-	"github.com/Monet/seki/internal/validate"
+	"github.com/entoten/seki/internal/storage"
+	"github.com/entoten/seki/internal/validate"
 )
 
 // registerClientRoutesOn registers client-related admin API routes on the given mux.

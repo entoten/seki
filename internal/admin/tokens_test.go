@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Monet/seki/internal/admin"
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/admin"
+	"github.com/entoten/seki/internal/storage"
 
-	_ "github.com/Monet/seki/internal/storage/sqlite"
+	_ "github.com/entoten/seki/internal/storage/sqlite"
 )
 
 func setupPATHandler(t *testing.T) (*admin.Handler, storage.Storage) {

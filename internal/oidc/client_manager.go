@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/crypto"
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/crypto"
+	"github.com/entoten/seki/internal/storage"
 )
 
 // SeedClientsFromConfig creates clients from the YAML configuration if they

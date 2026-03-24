@@ -3,7 +3,7 @@ package storage
 import (
 	"fmt"
 
-	"github.com/Monet/seki/internal/config"
+	"github.com/entoten/seki/internal/config"
 )
 
 // NewFunc is the type for driver-specific constructor functions.

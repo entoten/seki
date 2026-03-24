@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Monet/seki/internal/storage"
-	_ "github.com/Monet/seki/internal/storage/sqlite" // register sqlite driver
+	"github.com/entoten/seki/internal/storage"
+	_ "github.com/entoten/seki/internal/storage/sqlite" // register sqlite driver
 )
 
 func newTestStore(t *testing.T) storage.Storage {

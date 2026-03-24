@@ -15,15 +15,15 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/Monet/seki/internal/admin"
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/crypto"
-	"github.com/Monet/seki/internal/oidc"
-	"github.com/Monet/seki/internal/ratelimit"
-	"github.com/Monet/seki/internal/session"
-	"github.com/Monet/seki/internal/storage"
-	_ "github.com/Monet/seki/internal/storage/sqlite"
-	"github.com/Monet/seki/internal/validate"
+	"github.com/entoten/seki/internal/admin"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/crypto"
+	"github.com/entoten/seki/internal/oidc"
+	"github.com/entoten/seki/internal/ratelimit"
+	"github.com/entoten/seki/internal/session"
+	"github.com/entoten/seki/internal/storage"
+	_ "github.com/entoten/seki/internal/storage/sqlite"
+	"github.com/entoten/seki/internal/validate"
 )
 
 // ---------------------------------------------------------------------------

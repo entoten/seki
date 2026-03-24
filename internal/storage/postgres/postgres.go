@@ -9,8 +9,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/storage"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/storage"
 )
 
 // sessionListResponse is the JSON envelope for GET /api/v1/users/{id}/sessions.

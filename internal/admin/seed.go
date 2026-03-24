@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/storage"
 )
 
 // SeedOrgsFromConfig creates organizations and their roles from the YAML

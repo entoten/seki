@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Monet/seki/internal/authn/pat"
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/authn/pat"
+	"github.com/entoten/seki/internal/storage"
 )
 
 // registerPATRoutesOn registers personal access token admin API routes.

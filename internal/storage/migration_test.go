@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/Monet/seki/internal/storage/sqlite"
+	"github.com/entoten/seki/internal/storage/sqlite"
 
 	_ "modernc.org/sqlite"
 )

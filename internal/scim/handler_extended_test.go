@@ -7,9 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Monet/seki/internal/scim"
-	"github.com/Monet/seki/internal/storage"
-	_ "github.com/Monet/seki/internal/storage/sqlite"
+	"github.com/entoten/seki/internal/scim"
+	"github.com/entoten/seki/internal/storage"
+	_ "github.com/entoten/seki/internal/storage/sqlite"
 )
 
 func TestPatchGroupRenameAndMembers(t *testing.T) {

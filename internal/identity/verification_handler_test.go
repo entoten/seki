@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/storage"
-	_ "github.com/Monet/seki/internal/storage/sqlite"
-	"github.com/Monet/seki/internal/webhook"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/storage"
+	_ "github.com/entoten/seki/internal/storage/sqlite"
+	"github.com/entoten/seki/internal/webhook"
 )
 
 func setupHandlerTest(t *testing.T) (*VerificationHandler, *VerificationService, storage.Storage) {

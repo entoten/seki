@@ -3,9 +3,9 @@ package admin
 import (
 	"net/http"
 
-	"github.com/Monet/seki/internal/audit"
-	"github.com/Monet/seki/internal/storage"
-	"github.com/Monet/seki/internal/validate"
+	"github.com/entoten/seki/internal/audit"
+	"github.com/entoten/seki/internal/storage"
+	"github.com/entoten/seki/internal/validate"
 )
 
 // Handler serves the Admin REST API.

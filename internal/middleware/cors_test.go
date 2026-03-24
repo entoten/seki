@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Monet/seki/internal/config"
+	"github.com/entoten/seki/internal/config"
 )
 
 func newTestHandler() http.Handler {

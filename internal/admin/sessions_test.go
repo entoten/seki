@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Monet/seki/internal/admin"
-	"github.com/Monet/seki/internal/storage"
-	_ "github.com/Monet/seki/internal/storage/sqlite"
+	"github.com/entoten/seki/internal/admin"
+	"github.com/entoten/seki/internal/storage"
+	_ "github.com/entoten/seki/internal/storage/sqlite"
 )
 
 func newAdminHandlerWithStore(t *testing.T, s storage.Storage) *admin.Handler {

@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Monet/seki/internal/config"
+	"github.com/entoten/seki/internal/config"
 )
 
 // window tracks requests in a sliding window.

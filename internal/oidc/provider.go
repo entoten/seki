@@ -3,11 +3,11 @@ package oidc
 import (
 	"net/http"
 
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/crypto"
-	"github.com/Monet/seki/internal/ratelimit"
-	"github.com/Monet/seki/internal/session"
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/crypto"
+	"github.com/entoten/seki/internal/ratelimit"
+	"github.com/entoten/seki/internal/session"
+	"github.com/entoten/seki/internal/storage"
 )
 
 // Provider serves OIDC discovery and JWKS endpoints.

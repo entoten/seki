@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Monet/seki/pkg/client"
+	"github.com/entoten/seki/pkg/client"
 )
 
 // Config holds migration settings shared by all importers.

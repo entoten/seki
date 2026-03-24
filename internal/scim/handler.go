@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/Monet/seki/internal/admin"
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/admin"
+	"github.com/entoten/seki/internal/storage"
 )
 
 // Handler serves the SCIM 2.0 provisioning API.

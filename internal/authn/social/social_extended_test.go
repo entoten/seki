@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/storage"
-	"github.com/Monet/seki/internal/storage/sqlite"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/storage"
+	"github.com/entoten/seki/internal/storage/sqlite"
 )
 
 func newTestStoreAndService(t *testing.T) (*Service, storage.Storage) {

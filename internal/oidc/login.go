@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/storage"
-	"github.com/Monet/seki/web/login"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/storage"
+	"github.com/entoten/seki/web/login"
 )
 
 // loginPageData holds the template data for the login page.

@@ -119,7 +119,7 @@ custom tooling or a future native Terraform provider. See the package
 documentation for details:
 
 ```go
-import "github.com/Monet/seki/pkg/client"
+import "github.com/entoten/seki/pkg/client"
 
 c := client.New("http://localhost:8080", "my-api-key")
 oc, err := c.CreateClient(ctx, client.CreateClientInput{

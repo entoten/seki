@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Monet/seki/pkg/client"
+	"github.com/entoten/seki/pkg/client"
 )
 
 // KeycloakRealmExport represents a Keycloak realm export.

@@ -10,7 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 
-	"github.com/Monet/seki/internal/metrics"
+	"github.com/entoten/seki/internal/metrics"
 )
 
 // setup creates a fresh registry and re-registers the metrics so tests are

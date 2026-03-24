@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Monet/seki/internal/migrate"
-	"github.com/Monet/seki/pkg/client"
+	"github.com/entoten/seki/internal/migrate"
+	"github.com/entoten/seki/pkg/client"
 )
 
 var version = "0.1.0-dev"

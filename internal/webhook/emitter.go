@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Monet/seki/internal/config"
+	"github.com/entoten/seki/internal/config"
 )
 
 // Payload is the webhook delivery envelope.

@@ -12,8 +12,8 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
 
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/storage"
 )
 
 // Service provides WebAuthn registration and authentication operations.

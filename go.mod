@@ -1,4 +1,4 @@
-module github.com/Monet/seki
+module github.com/entoten/seki
 
 go 1.26.1
 

@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/storage"
 )
 
 // ErrExpired indicates that a session has expired (idle or absolute timeout).

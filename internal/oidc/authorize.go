@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Monet/seki/internal/storage"
-	"github.com/Monet/seki/internal/validate"
+	"github.com/entoten/seki/internal/storage"
+	"github.com/entoten/seki/internal/validate"
 )
 
 // authCodeTTL is the lifetime of an authorization code.

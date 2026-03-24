@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Monet/seki/internal/admin"
-	"github.com/Monet/seki/internal/audit"
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/storage"
-	_ "github.com/Monet/seki/internal/storage/sqlite"
+	"github.com/entoten/seki/internal/admin"
+	"github.com/entoten/seki/internal/audit"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/storage"
+	_ "github.com/entoten/seki/internal/storage/sqlite"
 )
 
 func setupImpersonateHandler(t *testing.T) (*admin.Handler, storage.Storage) {

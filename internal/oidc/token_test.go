@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Monet/seki/internal/crypto"
-	"github.com/Monet/seki/internal/oidc"
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/crypto"
+	"github.com/entoten/seki/internal/oidc"
+	"github.com/entoten/seki/internal/storage"
 
-	_ "github.com/Monet/seki/internal/storage/sqlite"
+	_ "github.com/entoten/seki/internal/storage/sqlite"
 )
 
 // tokenHarness extends the test harness with helpers specific to token tests.

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Monet/seki/internal/validate"
+	"github.com/entoten/seki/internal/validate"
 )
 
 // tokenPaths lists path prefixes for token/auth endpoints that should

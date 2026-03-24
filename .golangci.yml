@@ -21,7 +21,7 @@ linters-settings:
   gofmt:
     simplify: true
   goimports:
-    local-prefixes: github.com/Monet/seki
+    local-prefixes: github.com/entoten/seki
   exhaustive:
     default-signifies-exhaustive: true
 

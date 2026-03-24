@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Monet/seki/internal/audit"
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/storage"
-	_ "github.com/Monet/seki/internal/storage/sqlite"
+	"github.com/entoten/seki/internal/audit"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/storage"
+	_ "github.com/entoten/seki/internal/storage/sqlite"
 )
 
 func newTestLogger(t *testing.T) (*audit.Logger, storage.Storage) {

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/Monet/seki/internal/storage"
+	"github.com/entoten/seki/internal/storage"
 )
 
 // registerBrandingRoutesOn registers branding-related admin API routes on the given mux.

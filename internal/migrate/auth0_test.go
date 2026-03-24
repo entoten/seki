@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Monet/seki/pkg/client"
+	"github.com/entoten/seki/pkg/client"
 )
 
 func TestParseAuth0Export_UserArray(t *testing.T) {

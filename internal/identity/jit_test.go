@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/storage"
-	_ "github.com/Monet/seki/internal/storage/sqlite"
-	"github.com/Monet/seki/internal/webhook"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/storage"
+	_ "github.com/entoten/seki/internal/storage/sqlite"
+	"github.com/entoten/seki/internal/webhook"
 )
 
 func newJITTestService(t *testing.T, enabled bool) (*JITService, storage.Storage) {

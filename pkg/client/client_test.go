@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Monet/seki/pkg/client"
+	"github.com/entoten/seki/pkg/client"
 )
 
 // -----------------------------------------------------------------------

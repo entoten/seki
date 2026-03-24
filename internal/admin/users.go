@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/Monet/seki/internal/storage"
-	"github.com/Monet/seki/internal/validate"
+	"github.com/entoten/seki/internal/storage"
+	"github.com/entoten/seki/internal/validate"
 )
 
 // createUserRequest is the JSON body for POST /api/v1/users.

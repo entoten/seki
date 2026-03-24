@@ -10,10 +10,10 @@ import (
 
 	"github.com/go-webauthn/webauthn/webauthn"
 
-	"github.com/Monet/seki/internal/authn/passkey"
-	"github.com/Monet/seki/internal/config"
-	"github.com/Monet/seki/internal/storage"
-	_ "github.com/Monet/seki/internal/storage/sqlite" // register driver
+	"github.com/entoten/seki/internal/authn/passkey"
+	"github.com/entoten/seki/internal/config"
+	"github.com/entoten/seki/internal/storage"
+	_ "github.com/entoten/seki/internal/storage/sqlite" // register driver
 )
 
 func newTestStore(t *testing.T) storage.Storage {

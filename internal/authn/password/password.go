@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Monet/seki/internal/crypto"
-	"github.com/Monet/seki/internal/storage"
-	"github.com/Monet/seki/internal/validate"
+	"github.com/entoten/seki/internal/crypto"
+	"github.com/entoten/seki/internal/storage"
+	"github.com/entoten/seki/internal/validate"
 )
 
 const credentialType = "password"
