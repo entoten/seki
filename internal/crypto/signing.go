@@ -221,6 +221,88 @@ func parseEd25519PrivateKeyPEM(data []byte) (ed25519.PrivateKey, error) {
 	return edKey, nil
 }
 
+// KeySet holds multiple signing keys to support key rotation.
+// The current key is used for signing new tokens; all keys are published
+// in the JWKS endpoint and can be used for verification.
+type KeySet struct {
+	keys    []Signer
+	current int // index of current signing key
+}
+
+// NewKeySet creates a KeySet from one or more signers. The first signer is the
+// current signing key; subsequent signers are old (rotated) keys kept for
+// verification of previously-issued tokens.
+func NewKeySet(signers ...Signer) *KeySet {
+	return &KeySet{
+		keys:    signers,
+		current: 0,
+	}
+}
+
+// Current returns the active signing key used for new tokens.
+func (ks *KeySet) Current() Signer {
+	return ks.keys[ks.current]
+}
+
+// AllPublicKeys returns the JWK representations of every key in the set,
+// suitable for the JWKS endpoint.
+func (ks *KeySet) AllPublicKeys() []map[string]interface{} {
+	result := make([]map[string]interface{}, len(ks.keys))
+	for i, k := range ks.keys {
+		result[i] = k.PublicKeyJWK()
+	}
+	return result
+}
+
+// VerifyAny attempts to verify the given token against all keys in the set,
+// trying the current key first. It returns the claims from the first successful
+// verification, or the last error if all keys fail.
+func (ks *KeySet) VerifyAny(token string) (map[string]interface{}, error) {
+	// Try current key first.
+	claims, err := ks.keys[ks.current].Verify(token)
+	if err == nil {
+		return claims, nil
+	}
+
+	var lastErr error = err
+	for i, k := range ks.keys {
+		if i == ks.current {
+			continue
+		}
+		claims, err := k.Verify(token)
+		if err == nil {
+			return claims, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
+
+// Sign delegates to the current key's Sign method.
+func (ks *KeySet) Sign(claims map[string]interface{}) (string, error) {
+	return ks.keys[ks.current].Sign(claims)
+}
+
+// Verify tries all keys using VerifyAny. This implements the Signer interface.
+func (ks *KeySet) Verify(tokenString string) (map[string]interface{}, error) {
+	return ks.VerifyAny(tokenString)
+}
+
+// PublicKeyJWK returns the current key's JWK. For the full set, use AllPublicKeys.
+func (ks *KeySet) PublicKeyJWK() map[string]interface{} {
+	return ks.keys[ks.current].PublicKeyJWK()
+}
+
+// Algorithm returns the current key's algorithm.
+func (ks *KeySet) Algorithm() string {
+	return ks.keys[ks.current].Algorithm()
+}
+
+// KeyID returns the current key's identifier.
+func (ks *KeySet) KeyID() string {
+	return ks.keys[ks.current].KeyID()
+}
+
 // writeEd25519PrivateKeyPEM marshals and writes an Ed25519 private key in PEM format.
 func writeEd25519PrivateKeyPEM(path string, key ed25519.PrivateKey) error {
 	der, err := x509.MarshalPKCS8PrivateKey(key)

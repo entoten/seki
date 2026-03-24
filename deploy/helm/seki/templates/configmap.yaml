@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "seki.fullname" . }}-config
+  labels:
+    {{- include "seki.labels" . | nindent 4 }}
+data:
+  seki.yaml: |
+    server:
+      address: ":8080"
+      issuer: {{ .Values.config.server.issuer | quote }}
+    database:
+      driver: {{ .Values.config.database.driver | quote }}
+      dsn: {{ .Values.config.database.dsn | quote }}
+    signing:
+      algorithm: {{ .Values.config.signing.algorithm | quote }}
+      key_file: /etc/seki/keys/signing.key
+    authentication:
+      passkey:
+        enabled: {{ .Values.config.authentication.passkey.enabled }}
+        rp_name: {{ .Values.config.authentication.passkey.rp_name | quote }}
+        rp_id: {{ .Values.config.authentication.passkey.rp_id | quote }}
+      totp:
+        enabled: {{ .Values.config.authentication.totp.enabled }}

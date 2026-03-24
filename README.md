@@ -236,7 +236,9 @@ Errors follow [RFC 7807 Problem Details](https://www.rfc-editor.org/rfc/rfc7807)
 }
 ```
 
-See the full OpenAPI spec at [`api/openapi.yaml`](api/openapi.yaml).
+See the full OpenAPI spec at [`api/openapi.yaml`](api/openapi.yaml). An interactive API explorer is available at `/api/docs` when seki is running.
+
+See [Standards Compliance](docs/standards-compliance.md) for full RFC coverage.
 
 ## Architecture
 

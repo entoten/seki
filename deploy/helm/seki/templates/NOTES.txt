@@ -1,0 +1,19 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Your release is named: {{ .Release.Name }}
+
+To get the application URL:
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+  https://{{ .host }}
+{{- end }}
+{{- else if contains "ClusterIP" .Values.service.type }}
+  kubectl port-forward svc/{{ include "seki.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  Then visit: http://localhost:{{ .Values.service.port }}
+{{- else if contains "LoadBalancer" .Values.service.type }}
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+  kubectl get svc {{ include "seki.fullname" . }} -w
+{{- end }}
+
+OIDC Discovery: {{ .Values.config.server.issuer }}/.well-known/openid-configuration
+JWKS Endpoint:  {{ .Values.config.server.issuer }}/.well-known/jwks.json

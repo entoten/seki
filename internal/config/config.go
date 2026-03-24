@@ -83,8 +83,10 @@ type DatabaseConfig struct {
 
 // SigningConfig holds token signing settings.
 type SigningConfig struct {
-	Algorithm string `yaml:"algorithm"`
-	KeyFile   string `yaml:"key_file"`
+	Algorithm   string   `yaml:"algorithm"`
+	KeyFile     string   `yaml:"key_file"`
+	OldKeyFiles []string `yaml:"old_key_files"`  // rotated keys still valid for verification
+	RotationTTL string   `yaml:"rotation_ttl"`   // how long old keys stay valid
 }
 
 // ClientConfig holds an OIDC/OAuth2 client definition.

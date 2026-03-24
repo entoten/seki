@@ -11,6 +11,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/entoten/seki/api"
 	"github.com/entoten/seki/internal/admin"
 	"github.com/entoten/seki/internal/audit"
 	"github.com/entoten/seki/internal/authn/passkey"
@@ -29,6 +30,7 @@ import (
 	"github.com/entoten/seki/internal/telemetry"
 	"github.com/entoten/seki/internal/webhook"
 	adminui "github.com/entoten/seki/web/admin"
+	docsui "github.com/entoten/seki/web/docs"
 )
 
 // Server wraps the HTTP server and its dependencies.
@@ -142,6 +144,11 @@ func (s *Server) registerRoutes() {
 	adminFS, _ := fs.Sub(adminui.FS, ".")
 	s.mux.Handle("GET /admin", http.RedirectHandler("/admin/", http.StatusMovedPermanently))
 	s.mux.Handle("GET /admin/", http.StripPrefix("/admin/", http.FileServer(http.FS(adminFS))))
+
+	// API documentation (Scalar UI) and OpenAPI spec — no auth required.
+	docsFS, _ := fs.Sub(docsui.FS, ".")
+	s.mux.HandleFunc("GET /api/openapi.yaml", s.handleOpenAPISpec)
+	s.mux.Handle("GET /api/docs", http.FileServer(http.FS(docsFS)))
 
 	// pprof debug endpoints (behind admin API key auth when enabled).
 	if s.cfg.Debug.PprofEnabled {
@@ -257,4 +264,12 @@ func (s *Server) AuditLogger() *audit.Logger {
 // WebhookEmitter returns the server's webhook emitter for use by callers.
 func (s *Server) WebhookEmitter() *webhook.Emitter {
 	return s.webhooks
+}
+
+// handleOpenAPISpec serves the embedded OpenAPI specification.
+func (s *Server) handleOpenAPISpec(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/yaml; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(api.OpenAPISpec)
 }

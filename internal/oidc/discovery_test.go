@@ -155,3 +155,79 @@ func TestJWKSEndpoint(t *testing.T) {
 		t.Error("x (public key) is missing or empty")
 	}
 }
+
+func TestJWKSEndpoint_CacheControl(t *testing.T) {
+	signer := newTestSigner(t)
+	provider := oidc.NewProvider("https://auth.example.com", signer, nil)
+
+	mux := http.NewServeMux()
+	provider.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/.well-known/jwks.json", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	cc := rec.Header().Get("Cache-Control")
+	if cc != "public, max-age=900" {
+		t.Errorf("Cache-Control = %q, want %q", cc, "public, max-age=900")
+	}
+}
+
+func TestJWKSEndpoint_MultipleKeys(t *testing.T) {
+	_, priv1, _ := ed25519.GenerateKey(rand.Reader)
+	_, priv2, _ := ed25519.GenerateKey(rand.Reader)
+	_, priv3, _ := ed25519.GenerateKey(rand.Reader)
+
+	s1 := crypto.NewEd25519SignerFromKey(priv1, "kid-current", "https://auth.example.com", time.Hour)
+	s2 := crypto.NewEd25519SignerFromKey(priv2, "kid-old-1", "https://auth.example.com", time.Hour)
+	s3 := crypto.NewEd25519SignerFromKey(priv3, "kid-old-2", "https://auth.example.com", time.Hour)
+
+	ks := crypto.NewKeySet(s1, s2, s3)
+	provider := oidc.NewProvider("https://auth.example.com", ks, nil)
+
+	mux := http.NewServeMux()
+	provider.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/.well-known/jwks.json", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	var body map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decoding response: %v", err)
+	}
+
+	keys, ok := body["keys"].([]interface{})
+	if !ok {
+		t.Fatal("keys field missing or not an array")
+	}
+	if len(keys) != 3 {
+		t.Fatalf("expected 3 keys, got %d", len(keys))
+	}
+
+	// Verify all kids are present and unique.
+	kids := map[string]bool{}
+	for _, k := range keys {
+		keyMap := k.(map[string]interface{})
+		kid := keyMap["kid"].(string)
+		if kids[kid] {
+			t.Errorf("duplicate kid: %s", kid)
+		}
+		kids[kid] = true
+	}
+
+	expectedKids := []string{"kid-current", "kid-old-1", "kid-old-2"}
+	for _, ek := range expectedKids {
+		if !kids[ek] {
+			t.Errorf("missing expected kid: %s", ek)
+		}
+	}
+}
