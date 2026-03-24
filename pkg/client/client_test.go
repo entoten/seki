@@ -23,6 +23,7 @@ type fakeServer struct {
 	orgs    map[string]client.Organization
 	members map[string][]client.OrgMember // orgSlug -> members
 	roles   map[string][]client.Role      // orgSlug -> roles
+	clients map[string]client.OAuthClient
 	audit   []client.AuditEntry
 	apiKey  string
 }
@@ -33,6 +34,7 @@ func newFakeServer(apiKey string) *fakeServer {
 		orgs:    make(map[string]client.Organization),
 		members: make(map[string][]client.OrgMember),
 		roles:   make(map[string][]client.Role),
+		clients: make(map[string]client.OAuthClient),
 		apiKey:  apiKey,
 	}
 }
@@ -99,6 +101,16 @@ func (s *fakeServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Audit
 	case method == "GET" && path == "/api/v1/audit-logs":
 		s.handleListAuditLogs(w, r)
+
+	// Clients
+	case method == "POST" && path == "/api/v1/clients":
+		s.handleCreateOAuthClient(w, r)
+	case method == "GET" && path == "/api/v1/clients":
+		s.handleListOAuthClients(w, r)
+	case method == "GET" && strings.HasPrefix(path, "/api/v1/clients/"):
+		s.handleGetOAuthClient(w, r)
+	case method == "DELETE" && strings.HasPrefix(path, "/api/v1/clients/"):
+		s.handleDeleteOAuthClient(w, r)
 
 	default:
 		s.writeProblem(w, http.StatusNotFound, "not found")
@@ -651,6 +663,95 @@ func (s *fakeServer) handleListAuditLogs(w http.ResponseWriter, r *http.Request)
 	s.writeJSON(w, http.StatusOK, resp)
 }
 
+// --- OAuth Client handlers ---
+
+func (s *fakeServer) handleCreateOAuthClient(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID           string   `json:"id"`
+		Name         string   `json:"name"`
+		RedirectURIs []string `json:"redirect_uris"`
+		GrantTypes   []string `json:"grant_types"`
+		Scopes       []string `json:"scopes"`
+		PKCERequired *bool    `json:"pkce_required"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeProblem(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.clients[req.ID]; ok {
+		s.writeProblem(w, http.StatusConflict, "client already exists")
+		return
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+	pkce := true
+	if req.PKCERequired != nil {
+		pkce = *req.PKCERequired
+	}
+	oc := client.OAuthClient{
+		ID:           req.ID,
+		Name:         req.Name,
+		RedirectURIs: req.RedirectURIs,
+		GrantTypes:   req.GrantTypes,
+		Scopes:       req.Scopes,
+		PKCERequired: pkce,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	if oc.RedirectURIs == nil {
+		oc.RedirectURIs = []string{}
+	}
+	if oc.GrantTypes == nil {
+		oc.GrantTypes = []string{}
+	}
+	if oc.Scopes == nil {
+		oc.Scopes = []string{}
+	}
+	s.clients[req.ID] = oc
+	s.writeJSON(w, http.StatusCreated, oc)
+}
+
+func (s *fakeServer) handleGetOAuthClient(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/api/v1/clients/")
+	s.mu.Lock()
+	oc, ok := s.clients[id]
+	s.mu.Unlock()
+	if !ok {
+		s.writeProblem(w, http.StatusNotFound, "client not found")
+		return
+	}
+	s.writeJSON(w, http.StatusOK, oc)
+}
+
+func (s *fakeServer) handleListOAuthClients(w http.ResponseWriter, _ *http.Request) {
+	s.mu.Lock()
+	var list []client.OAuthClient
+	for _, oc := range s.clients {
+		list = append(list, oc)
+	}
+	s.mu.Unlock()
+	if list == nil {
+		list = []client.OAuthClient{}
+	}
+	resp := struct {
+		Data []client.OAuthClient `json:"data"`
+	}{Data: list}
+	s.writeJSON(w, http.StatusOK, resp)
+}
+
+func (s *fakeServer) handleDeleteOAuthClient(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/api/v1/clients/")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.clients[id]; !ok {
+		s.writeProblem(w, http.StatusNotFound, "client not found")
+		return
+	}
+	delete(s.clients, id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // --- Helper ---
 
 var idCounter int
@@ -1063,5 +1164,92 @@ func TestWithHTTPClient(t *testing.T) {
 	_, err := c.ListUsers(context.Background(), client.ListOptions{})
 	if err != nil {
 		t.Fatalf("ListUsers with custom HTTP client: %v", err)
+	}
+}
+
+func TestOAuthClientCRUD(t *testing.T) {
+	c, _ := setupTest(t)
+	ctx := context.Background()
+
+	pkce := true
+	// Create
+	oc, err := c.CreateClient(ctx, client.CreateClientInput{
+		ID:           "my-app",
+		Name:         "My Application",
+		RedirectURIs: []string{"https://app.example.com/callback"},
+		GrantTypes:   []string{"authorization_code"},
+		Scopes:       []string{"openid", "profile"},
+		PKCERequired: &pkce,
+	})
+	if err != nil {
+		t.Fatalf("CreateClient: %v", err)
+	}
+	if oc.ID != "my-app" {
+		t.Errorf("id = %q, want %q", oc.ID, "my-app")
+	}
+	if oc.Name != "My Application" {
+		t.Errorf("name = %q, want %q", oc.Name, "My Application")
+	}
+	if !oc.PKCERequired {
+		t.Error("expected PKCERequired to be true")
+	}
+
+	// Get
+	fetched, err := c.GetClient(ctx, "my-app")
+	if err != nil {
+		t.Fatalf("GetClient: %v", err)
+	}
+	if fetched.Name != "My Application" {
+		t.Errorf("name = %q, want %q", fetched.Name, "My Application")
+	}
+
+	// List
+	list, err := c.ListClients(ctx)
+	if err != nil {
+		t.Fatalf("ListClients: %v", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("expected 1 client, got %d", len(list))
+	}
+
+	// Delete
+	if err := c.DeleteClient(ctx, "my-app"); err != nil {
+		t.Fatalf("DeleteClient: %v", err)
+	}
+
+	// Get after delete should 404
+	_, err = c.GetClient(ctx, "my-app")
+	if !client.IsNotFound(err) {
+		t.Errorf("expected not found error, got %v", err)
+	}
+
+	// List should be empty
+	list, err = c.ListClients(ctx)
+	if err != nil {
+		t.Fatalf("ListClients after delete: %v", err)
+	}
+	if len(list) != 0 {
+		t.Errorf("expected 0 clients, got %d", len(list))
+	}
+}
+
+func TestOAuthClientConflict(t *testing.T) {
+	c, _ := setupTest(t)
+	ctx := context.Background()
+
+	_, err := c.CreateClient(ctx, client.CreateClientInput{
+		ID:   "dup-client",
+		Name: "Client 1",
+	})
+	if err != nil {
+		t.Fatalf("first CreateClient: %v", err)
+	}
+
+	_, err = c.CreateClient(ctx, client.CreateClientInput{
+		ID:   "dup-client",
+		Name: "Client 2",
+	})
+	if !client.IsConflict(err) {
+		t.Errorf("expected IsConflict, got %v", err)
 	}
 }

@@ -34,6 +34,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	h.registerRoleRoutesOn(api)
 	h.registerAuditRoutesOn(api)
 	h.registerSessionRoutesOn(api)
+	h.registerClientRoutesOn(api)
 
 	// Wrap with authentication and mount on the outer mux.
 	authMiddleware := RequireAPIKey(h.apiKeys)
