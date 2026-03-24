@@ -255,10 +255,10 @@ func TestExchange_UnknownProvider(t *testing.T) {
 
 func TestNewService_IgnoresUnknownProvider(t *testing.T) {
 	cfg := map[string]config.SocialProvider{
-		"twitter": {ClientID: "tid", ClientSecret: "tsecret"},
+		"nonexistent_xyz": {ClientID: "tid", ClientSecret: "tsecret"},
 	}
 	svc := NewService(cfg, nil)
-	_, err := svc.GetProvider("twitter")
+	_, err := svc.GetProvider("nonexistent_xyz")
 	if err != ErrUnknownProvider {
 		t.Fatalf("expected ErrUnknownProvider for unsupported provider, got %v", err)
 	}

@@ -19,6 +19,7 @@ import (
 // Well-known OAuth2 endpoints for supported providers.
 // #nosec G101 -- false positive: these are public OAuth2 endpoint URLs, not credentials
 var knownProviders = map[string]Provider{
+	// --- Major Identity Providers ---
 	"google": {
 		Name:        "google",
 		AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth",
@@ -26,12 +27,93 @@ var knownProviders = map[string]Provider{
 		UserInfoURL: "https://www.googleapis.com/oauth2/v3/userinfo",
 		Scopes:      []string{"openid", "email", "profile"},
 	},
+	"microsoft": {
+		Name:        "microsoft",
+		AuthURL:     "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+		TokenURL:    "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+		UserInfoURL: "https://graph.microsoft.com/v1.0/me",
+		Scopes:      []string{"openid", "email", "profile", "User.Read"},
+	},
+	"apple": {
+		Name:        "apple",
+		AuthURL:     "https://appleid.apple.com/auth/authorize",
+		TokenURL:    "https://appleid.apple.com/auth/token",
+		UserInfoURL: "", // Apple returns user info in the ID token, not a userinfo endpoint
+		Scopes:      []string{"name", "email"},
+	},
+	// --- Developer Platforms ---
 	"github": {
 		Name:        "github",
 		AuthURL:     "https://github.com/login/oauth/authorize",
 		TokenURL:    "https://github.com/login/oauth/access_token",
 		UserInfoURL: "https://api.github.com/user",
 		Scopes:      []string{"user:email"},
+	},
+	"gitlab": {
+		Name:        "gitlab",
+		AuthURL:     "https://gitlab.com/oauth/authorize",
+		TokenURL:    "https://gitlab.com/oauth/token",
+		UserInfoURL: "https://gitlab.com/api/v4/user",
+		Scopes:      []string{"openid", "email", "profile"},
+	},
+	"bitbucket": {
+		Name:        "bitbucket",
+		AuthURL:     "https://bitbucket.org/site/oauth2/authorize",
+		TokenURL:    "https://bitbucket.org/site/oauth2/access_token",
+		UserInfoURL: "https://api.bitbucket.org/2.0/user",
+		Scopes:      []string{"account", "email"},
+	},
+	// --- Social / Communication ---
+	"discord": {
+		Name:        "discord",
+		AuthURL:     "https://discord.com/api/oauth2/authorize",
+		TokenURL:    "https://discord.com/api/oauth2/token",
+		UserInfoURL: "https://discord.com/api/users/@me",
+		Scopes:      []string{"identify", "email"},
+	},
+	"slack": {
+		Name:        "slack",
+		AuthURL:     "https://slack.com/openid/connect/authorize",
+		TokenURL:    "https://slack.com/api/openid.connect.token",
+		UserInfoURL: "https://slack.com/api/openid.connect.userInfo",
+		Scopes:      []string{"openid", "email", "profile"},
+	},
+	"twitter": {
+		Name:        "twitter",
+		AuthURL:     "https://twitter.com/i/oauth2/authorize",
+		TokenURL:    "https://api.twitter.com/2/oauth2/token",
+		UserInfoURL: "https://api.twitter.com/2/users/me",
+		Scopes:      []string{"users.read", "tweet.read"},
+	},
+	"facebook": {
+		Name:        "facebook",
+		AuthURL:     "https://www.facebook.com/v19.0/dialog/oauth",
+		TokenURL:    "https://graph.facebook.com/v19.0/oauth/access_token",
+		UserInfoURL: "https://graph.facebook.com/v19.0/me?fields=id,name,email,picture",
+		Scopes:      []string{"email", "public_profile"},
+	},
+	"line": {
+		Name:        "line",
+		AuthURL:     "https://access.line.me/oauth2/v2.1/authorize",
+		TokenURL:    "https://api.line.me/oauth2/v2.1/token",
+		UserInfoURL: "https://api.line.me/v2/profile",
+		Scopes:      []string{"profile", "openid", "email"},
+	},
+	// --- Professional ---
+	"linkedin": {
+		Name:        "linkedin",
+		AuthURL:     "https://www.linkedin.com/oauth/v2/authorization",
+		TokenURL:    "https://www.linkedin.com/oauth/v2/accessToken",
+		UserInfoURL: "https://api.linkedin.com/v2/userinfo",
+		Scopes:      []string{"openid", "email", "profile"},
+	},
+	// --- Cloud / Hosting ---
+	"amazon": {
+		Name:        "amazon",
+		AuthURL:     "https://www.amazon.com/ap/oa",
+		TokenURL:    "https://api.amazon.com/auth/o2/token",
+		UserInfoURL: "https://api.amazon.com/user/profile",
+		Scopes:      []string{"profile", "profile:user_id"},
 	},
 }
 
@@ -306,23 +388,7 @@ func (s *Service) fetchUserInfo(ctx context.Context, p *Provider, accessToken st
 	}
 
 	// Parse provider-specific fields.
-	switch p.Name {
-	case "google":
-		user.ProviderID = stringFromMap(data, "sub")
-		user.Email = stringFromMap(data, "email")
-		user.Name = stringFromMap(data, "name")
-		user.AvatarURL = stringFromMap(data, "picture")
-	case "github":
-		if id, ok := data["id"].(float64); ok {
-			user.ProviderID = fmt.Sprintf("%.0f", id)
-		}
-		user.Email = stringFromMap(data, "email")
-		user.Name = stringFromMap(data, "name")
-		if user.Name == "" {
-			user.Name = stringFromMap(data, "login")
-		}
-		user.AvatarURL = stringFromMap(data, "avatar_url")
-	}
+	parseProviderUser(p.Name, data, user)
 
 	return user, nil
 }
