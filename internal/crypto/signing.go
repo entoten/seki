@@ -18,6 +18,8 @@ import (
 type Signer interface {
 	// Sign creates a signed JWT from the given claims map.
 	Sign(claims map[string]interface{}) (string, error)
+	// SignWithHeaders creates a signed JWT with custom header fields (e.g., typ).
+	SignWithHeaders(claims map[string]interface{}, headers map[string]string) (string, error)
 	// Verify parses and validates a JWT, returning the claims.
 	Verify(tokenString string) (map[string]interface{}, error)
 	// PublicKeyJWK returns the public key in JWK format for the JWKS endpoint.
@@ -140,6 +142,37 @@ func (s *Ed25519Signer) Sign(claims map[string]interface{}) (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodEdDSA, mapClaims)
 	token.Header["kid"] = s.keyID
+
+	signed, err := token.SignedString(s.privateKey)
+	if err != nil {
+		return "", fmt.Errorf("signing token: %w", err)
+	}
+
+	return signed, nil
+}
+
+// SignWithHeaders creates a signed JWT with custom header fields.
+func (s *Ed25519Signer) SignWithHeaders(claims map[string]interface{}, headers map[string]string) (string, error) {
+	now := time.Now()
+
+	mapClaims := jwt.MapClaims{
+		"iat": now.Unix(),
+		"exp": now.Add(s.tokenTTL).Unix(),
+	}
+
+	if s.issuer != "" {
+		mapClaims["iss"] = s.issuer
+	}
+
+	for k, v := range claims {
+		mapClaims[k] = v
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodEdDSA, mapClaims)
+	token.Header["kid"] = s.keyID
+	for k, v := range headers {
+		token.Header[k] = v
+	}
 
 	signed, err := token.SignedString(s.privateKey)
 	if err != nil {
@@ -281,6 +314,11 @@ func (ks *KeySet) VerifyAny(token string) (map[string]interface{}, error) {
 // Sign delegates to the current key's Sign method.
 func (ks *KeySet) Sign(claims map[string]interface{}) (string, error) {
 	return ks.keys[ks.current].Sign(claims)
+}
+
+// SignWithHeaders delegates to the current key's SignWithHeaders method.
+func (ks *KeySet) SignWithHeaders(claims map[string]interface{}, headers map[string]string) (string, error) {
+	return ks.keys[ks.current].SignWithHeaders(claims, headers)
 }
 
 // Verify tries all keys using VerifyAny. This implements the Signer interface.

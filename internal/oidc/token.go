@@ -46,6 +46,8 @@ func (p *Provider) handleToken(w http.ResponseWriter, r *http.Request) {
 		p.handleRefreshTokenGrant(w, r)
 	case "urn:ietf:params:oauth:grant-type:device_code":
 		p.handleDeviceCodeGrant(w, r)
+	case "urn:ietf:params:oauth:grant-type:token-exchange":
+		p.handleTokenExchangeGrant(w, r)
 	default:
 		tokenError(w, http.StatusBadRequest, "unsupported_grant_type", "unsupported grant_type")
 	}
@@ -56,7 +58,7 @@ func (p *Provider) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.R
 	ctx := r.Context()
 
 	// Authenticate client (or identify public client).
-	client, err := p.authenticateClient(r)
+	client, err := p.authenticateClientAll(r)
 	if err != nil {
 		tokenError(w, http.StatusUnauthorized, "invalid_client", err.Error())
 		return

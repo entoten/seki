@@ -64,6 +64,7 @@ func WithRateLimiter(l *ratelimit.Limiter) ProviderOption {
 // RegisterRoutes registers the OIDC discovery and JWKS routes on the given mux.
 func (p *Provider) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /.well-known/openid-configuration", p.handleDiscovery)
+	mux.HandleFunc("GET /.well-known/oauth-authorization-server", p.handleOAuthASMetadata)
 	mux.HandleFunc("GET /.well-known/jwks.json", p.handleJWKS)
 	mux.HandleFunc("GET /authorize", p.handleAuthorize)
 	mux.HandleFunc("POST /token", p.handleToken)

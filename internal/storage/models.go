@@ -30,16 +30,20 @@ type VerificationToken struct {
 
 // Client represents an OAuth2/OIDC client application.
 type Client struct {
-	ID           string          `json:"id"`
-	Name         string          `json:"name"`
-	SecretHash   string          `json:"-"`
-	RedirectURIs []string        `json:"redirect_uris"`
-	GrantTypes   []string        `json:"grant_types"`
-	Scopes       []string        `json:"scopes"`
-	PKCERequired bool            `json:"pkce_required"`
-	Metadata     json.RawMessage `json:"metadata"`
-	CreatedAt    time.Time       `json:"created_at"`
-	UpdatedAt    time.Time       `json:"updated_at"`
+	ID                         string          `json:"id"`
+	Name                       string          `json:"name"`
+	SecretHash                 string          `json:"-"`
+	RedirectURIs               []string        `json:"redirect_uris"`
+	GrantTypes                 []string        `json:"grant_types"`
+	Scopes                     []string        `json:"scopes"`
+	PKCERequired               bool            `json:"pkce_required"`
+	JWKsURI                    string          `json:"jwks_uri,omitempty"`
+	TokenEndpointAuthMethod    string          `json:"token_endpoint_auth_method,omitempty"`
+	BackChannelLogoutURI       string          `json:"backchannel_logout_uri,omitempty"`
+	BackChannelLogoutSessionReq bool           `json:"backchannel_logout_session_required,omitempty"`
+	Metadata                   json.RawMessage `json:"metadata"`
+	CreatedAt                  time.Time       `json:"created_at"`
+	UpdatedAt                  time.Time       `json:"updated_at"`
 }
 
 // Session represents an authenticated user session.

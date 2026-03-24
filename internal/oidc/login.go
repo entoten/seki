@@ -153,6 +153,10 @@ func loginClientIP(r *http.Request) string {
 func (p *Provider) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if p.sessions != nil {
 		if sessionID, err := p.sessions.GetSessionID(r); err == nil {
+			// Retrieve session to get user ID for back-channel logout.
+			if sess, sessErr := p.sessions.Get(r.Context(), sessionID); sessErr == nil {
+				p.triggerBackChannelLogout(r.Context(), sess.UserID, sessionID)
+			}
 			_ = p.sessions.Delete(r.Context(), sessionID)
 		}
 		p.sessions.ClearCookie(w)

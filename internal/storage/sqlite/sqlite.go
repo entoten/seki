@@ -204,11 +204,13 @@ func (s *Store) CreateClient(ctx context.Context, client *storage.Client) error 
 	meta := normalizeJSON(client.Metadata)
 	now := timeStr(client.CreatedAt)
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO clients (id, name, secret_hash, redirect_uris, grant_types, scopes, pkce_required, metadata, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO clients (id, name, secret_hash, redirect_uris, grant_types, scopes, pkce_required, metadata, created_at, updated_at, jwks_uri, token_endpoint_auth_method, backchannel_logout_uri, backchannel_logout_session_required)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		client.ID, client.Name, client.SecretHash,
 		string(redirects), string(grants), string(scopes),
 		boolToInt(client.PKCERequired), meta, now, now,
+		client.JWKsURI, client.TokenEndpointAuthMethod,
+		client.BackChannelLogoutURI, boolToInt(client.BackChannelLogoutSessionReq),
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -221,14 +223,14 @@ func (s *Store) CreateClient(ctx context.Context, client *storage.Client) error 
 
 func (s *Store) GetClient(ctx context.Context, id string) (*storage.Client, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, name, secret_hash, redirect_uris, grant_types, scopes, pkce_required, metadata, created_at, updated_at
+		`SELECT id, name, secret_hash, redirect_uris, grant_types, scopes, pkce_required, metadata, created_at, updated_at, jwks_uri, token_endpoint_auth_method, backchannel_logout_uri, backchannel_logout_session_required
 		 FROM clients WHERE id = ?`, id)
 	return scanClient(row)
 }
 
 func (s *Store) ListClients(ctx context.Context) ([]*storage.Client, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, secret_hash, redirect_uris, grant_types, scopes, pkce_required, metadata, created_at, updated_at
+		`SELECT id, name, secret_hash, redirect_uris, grant_types, scopes, pkce_required, metadata, created_at, updated_at, jwks_uri, token_endpoint_auth_method, backchannel_logout_uri, backchannel_logout_session_required
 		 FROM clients ORDER BY id ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("sqlite: list clients: %w", err)
@@ -1104,9 +1106,9 @@ func scanUserFromRows(rows *sql.Rows) (*storage.User, error) {
 func scanClient(row scanner) (*storage.Client, error) {
 	var c storage.Client
 	var redirects, grants, scopes, meta string
-	var pkce int
+	var pkce, bclSessionReq int
 	var createdAt, updatedAt string
-	err := row.Scan(&c.ID, &c.Name, &c.SecretHash, &redirects, &grants, &scopes, &pkce, &meta, &createdAt, &updatedAt)
+	err := row.Scan(&c.ID, &c.Name, &c.SecretHash, &redirects, &grants, &scopes, &pkce, &meta, &createdAt, &updatedAt, &c.JWKsURI, &c.TokenEndpointAuthMethod, &c.BackChannelLogoutURI, &bclSessionReq)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, storage.ErrNotFound
@@ -1117,6 +1119,7 @@ func scanClient(row scanner) (*storage.Client, error) {
 	_ = json.Unmarshal([]byte(grants), &c.GrantTypes)
 	_ = json.Unmarshal([]byte(scopes), &c.Scopes)
 	c.PKCERequired = pkce != 0
+	c.BackChannelLogoutSessionReq = bclSessionReq != 0
 	c.Metadata = json.RawMessage(meta)
 	c.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 	c.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)

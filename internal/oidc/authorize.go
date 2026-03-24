@@ -178,12 +178,13 @@ func (p *Provider) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// --- Redirect with code ---
+	// --- Redirect with code (RFC 9207: include iss parameter) ---
 	rq := parsed.Query()
 	rq.Set("code", code)
 	if state != "" {
 		rq.Set("state", state)
 	}
+	rq.Set("iss", p.issuer)
 	parsed.RawQuery = rq.Encode()
 
 	http.Redirect(w, r, parsed.String(), http.StatusFound)
@@ -259,12 +260,13 @@ func (p *Provider) completeAuthorize(w http.ResponseWriter, r *http.Request, cli
 		return
 	}
 
-	// --- Redirect with code ---
+	// --- Redirect with code (RFC 9207: include iss parameter) ---
 	rq := parsed.Query()
 	rq.Set("code", code)
 	if state != "" {
 		rq.Set("state", state)
 	}
+	rq.Set("iss", p.issuer)
 	parsed.RawQuery = rq.Encode()
 
 	http.Redirect(w, r, parsed.String(), http.StatusFound)

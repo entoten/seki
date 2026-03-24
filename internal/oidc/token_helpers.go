@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/entoten/seki/internal/storage"
@@ -18,23 +19,28 @@ func (p *Provider) generateAccessToken(sub, clientID string, scopes []string, no
 	return p.generateAccessTokenWithDPoP(sub, clientID, scopes, now, "")
 }
 
-// generateAccessTokenWithDPoP creates a signed JWT access token, optionally binding it to a DPoP key.
+// generateAccessTokenWithDPoP creates a signed JWT access token (RFC 9068 profile),
+// optionally binding it to a DPoP key.
 func (p *Provider) generateAccessTokenWithDPoP(sub, clientID string, scopes []string, now time.Time, dpopJKT string) (string, error) {
 	claims := map[string]interface{}{
-		"sub":   sub,
-		"aud":   clientID,
-		"scope": strings.Join(scopes, " "),
-		"iat":   now.Unix(),
-		"exp":   now.Add(accessTokenTTL).Unix(),
-		"iss":   p.issuer,
-		"typ":   "access_token",
+		"sub":       sub,
+		"aud":       clientID,
+		"client_id": clientID,
+		"scope":     strings.Join(scopes, " "),
+		"iat":       now.Unix(),
+		"exp":       now.Add(accessTokenTTL).Unix(),
+		"iss":       p.issuer,
+		"jti":       uuid.New().String(),
 	}
 	if dpopJKT != "" {
 		claims["cnf"] = map[string]string{
 			"jkt": dpopJKT,
 		}
 	}
-	return p.signer.Sign(claims)
+	headers := map[string]string{
+		"typ": "at+jwt",
+	}
+	return p.signer.SignWithHeaders(claims, headers)
 }
 
 // generateIDToken creates a signed JWT ID token with OIDC standard claims.
@@ -44,6 +50,8 @@ func (p *Provider) generateIDToken(user *storage.User, client *storage.Client, n
 	if acr == "" {
 		acr = ACRBasic
 	}
+	sid := generateTokenID() // unique session identifier for back-channel logout
+
 	claims := map[string]interface{}{
 		"sub": user.ID,
 		"iss": p.issuer,
@@ -51,6 +59,7 @@ func (p *Provider) generateIDToken(user *storage.User, client *storage.Client, n
 		"exp": now.Add(accessTokenTTL).Unix(),
 		"iat": now.Unix(),
 		"acr": acr,
+		"sid": sid,
 	}
 
 	if user.Email != "" {

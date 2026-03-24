@@ -656,8 +656,16 @@ func testTokenConformance(t *testing.T) {
 		if atClaims["iss"] != "https://auth.example.com" {
 			t.Errorf("access_token iss = %v, want https://auth.example.com", atClaims["iss"])
 		}
-		if atClaims["typ"] != "access_token" {
-			t.Errorf("access_token typ = %v, want access_token", atClaims["typ"])
+		if atClaims["client_id"] != "conf-client" {
+			t.Errorf("access_token client_id = %v, want conf-client", atClaims["client_id"])
+		}
+		if atClaims["jti"] == nil || atClaims["jti"] == "" {
+			t.Error("access_token missing jti claim")
+		}
+		// Verify JWT header typ is at+jwt (RFC 9068).
+		atHeader := decodeJWTHeader(t, atStr)
+		if atHeader["typ"] != "at+jwt" {
+			t.Errorf("access_token header typ = %v, want at+jwt", atHeader["typ"])
 		}
 	})
 
@@ -1082,4 +1090,22 @@ func testOAuth21Rejections(t *testing.T) {
 			t.Errorf("error = %v, want unsupported_grant_type", body["error"])
 		}
 	})
+}
+
+// decodeJWTHeader decodes the header portion of a JWT without verification.
+func decodeJWTHeader(t *testing.T, tokenStr string) map[string]interface{} {
+	t.Helper()
+	parts := strings.SplitN(tokenStr, ".", 3)
+	if len(parts) < 2 {
+		t.Fatalf("invalid JWT: expected at least 2 parts, got %d", len(parts))
+	}
+	headerBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		t.Fatalf("decode JWT header: %v", err)
+	}
+	var header map[string]interface{}
+	if err := json.Unmarshal(headerBytes, &header); err != nil {
+		t.Fatalf("unmarshal JWT header: %v", err)
+	}
+	return header
 }
