@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -420,10 +421,11 @@ func verifyClientSecret(secret, hash string) bool {
 }
 
 // verifyPKCE verifies the PKCE code_verifier against the stored code_challenge (S256).
+// Uses constant-time comparison to prevent timing side-channel attacks.
 func verifyPKCE(codeVerifier, codeChallenge string) bool {
 	h := sha256.Sum256([]byte(codeVerifier))
 	computed := base64.RawURLEncoding.EncodeToString(h[:])
-	return computed == codeChallenge
+	return subtle.ConstantTimeCompare([]byte(computed), []byte(codeChallenge)) == 1
 }
 
 // containsGrantType checks if a grant type list contains a specific grant.

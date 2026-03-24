@@ -17,14 +17,24 @@ func (p *Provider) handleUserInfo(w http.ResponseWriter, r *http.Request) {
 	claims, err := p.validateAccessToken(r)
 	if err != nil {
 		w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
-		http.Error(w, `{"error":"invalid_token","error_description":"`+err.Error()+`"}`, http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":             "invalid_token",
+			"error_description": "token validation failed",
+		})
 		return
 	}
 
 	sub, ok := claims["sub"].(string)
 	if !ok || sub == "" {
 		w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
-		http.Error(w, `{"error":"invalid_token","error_description":"missing sub claim"}`, http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":             "invalid_token",
+			"error_description": "missing sub claim",
+		})
 		return
 	}
 
@@ -39,7 +49,12 @@ func (p *Provider) handleUserInfo(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
-		http.Error(w, `{"error":"server_error","error_description":"failed to retrieve user"}`, http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":             "server_error",
+			"error_description": "failed to retrieve user",
+		})
 		return
 	}
 

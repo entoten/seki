@@ -113,6 +113,8 @@ func (h *Handler) handleCallback(w http.ResponseWriter, r *http.Request) {
 		Path:     "/authn/social/" + providerName + "/callback",
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{

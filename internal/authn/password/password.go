@@ -9,6 +9,7 @@ import (
 
 	"github.com/Monet/seki/internal/crypto"
 	"github.com/Monet/seki/internal/storage"
+	"github.com/Monet/seki/internal/validate"
 )
 
 const credentialType = "password"
@@ -16,6 +17,7 @@ const credentialType = "password"
 // Errors returned by the password service.
 var (
 	ErrPasswordTooShort = errors.New("password: must be at least 8 characters")
+	ErrPasswordTooLong  = errors.New("password: exceeds maximum length")
 	ErrNotConfigured    = errors.New("password: not configured for user")
 	ErrInvalidPassword  = errors.New("password: invalid password")
 )
@@ -37,8 +39,11 @@ func NewService(store storage.Storage) *Service {
 // Register creates a password credential for the given user.
 // The password must be at least 8 characters long.
 func (s *Service) Register(ctx context.Context, userID string, password string) error {
-	if len(password) < 8 {
+	if len(password) < validate.MinPasswordLen {
 		return ErrPasswordTooShort
+	}
+	if len(password) > validate.MaxPasswordLen {
+		return ErrPasswordTooLong
 	}
 
 	hash, err := s.hasher.Hash(password)
@@ -82,8 +87,11 @@ func (s *Service) Verify(ctx context.Context, userID string, password string) er
 
 // ChangePassword verifies the old password and replaces it with the new one.
 func (s *Service) ChangePassword(ctx context.Context, userID string, oldPassword, newPassword string) error {
-	if len(newPassword) < 8 {
+	if len(newPassword) < validate.MinPasswordLen {
 		return ErrPasswordTooShort
+	}
+	if len(newPassword) > validate.MaxPasswordLen {
+		return ErrPasswordTooLong
 	}
 
 	creds, err := s.store.GetCredentialsByUserAndType(ctx, userID, credentialType)

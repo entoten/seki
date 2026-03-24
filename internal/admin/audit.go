@@ -30,7 +30,7 @@ func (h *Handler) handleListAuditLogs(w http.ResponseWriter, r *http.Request) {
 
 	entries, nextCursor, err := h.store.ListAuditLogs(r.Context(), opts)
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, err.Error())
+		writeProblem(w, http.StatusInternalServerError, "failed to list audit logs")
 		return
 	}
 

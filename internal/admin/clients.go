@@ -3,11 +3,11 @@ package admin
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/Monet/seki/internal/storage"
+	"github.com/Monet/seki/internal/validate"
 )
 
 // registerClientRoutesOn registers client-related admin API routes on the given mux.
@@ -37,12 +37,16 @@ func (h *Handler) handleCreateClient(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.ID == "" {
-		writeProblem(w, http.StatusBadRequest, "id is required")
+	if err := validate.ClientID(req.ID); err != nil {
+		writeProblem(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if req.Name == "" {
-		writeProblem(w, http.StatusBadRequest, "name is required")
+	if err := validate.Name(req.Name); err != nil {
+		writeProblem(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validate.RedirectURIs(req.RedirectURIs); err != nil {
+		writeProblem(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -104,7 +108,7 @@ type clientListResponse struct {
 func (h *Handler) handleListClients(w http.ResponseWriter, r *http.Request) {
 	clients, err := h.store.ListClients(r.Context())
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, fmt.Sprintf("failed to list clients: %v", err))
+		writeProblem(w, http.StatusInternalServerError, "failed to list clients")
 		return
 	}
 	if clients == nil {

@@ -100,7 +100,7 @@ admin:
   api_keys: []
 `, address, issuer, driver, dsn)
 
-	if err := os.WriteFile("seki.yaml", []byte(tmpl), 0644); err != nil {
+	if err := os.WriteFile("seki.yaml", []byte(tmpl), 0600); err != nil {
 		fatalf("writing seki.yaml: %v", err)
 	}
 

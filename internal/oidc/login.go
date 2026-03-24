@@ -146,16 +146,42 @@ func (p *Provider) handleLogout(w http.ResponseWriter, r *http.Request) {
 		p.sessions.ClearCookie(w)
 	}
 
-	// Redirect to issuer root or a specified redirect.
+	// Redirect to issuer root or a validated redirect.
 	redirectTo := r.FormValue("redirect_uri")
-	if redirectTo == "" {
+	if !isSafeRedirect(redirectTo, p.issuer) {
 		redirectTo = p.issuer
 	}
-	// Ensure we only redirect to the issuer origin for safety.
 	if redirectTo == "" {
 		redirectTo = "/"
 	}
 	http.Redirect(w, r, redirectTo, http.StatusFound)
+}
+
+// isSafeRedirect validates that the redirect URL belongs to the same origin
+// as the issuer to prevent open redirect attacks.
+func isSafeRedirect(target, issuer string) bool {
+	if target == "" {
+		return false
+	}
+	// Allow relative paths.
+	if strings.HasPrefix(target, "/") && !strings.HasPrefix(target, "//") {
+		return true
+	}
+	parsed, err := url.Parse(target)
+	if err != nil {
+		return false
+	}
+	issuerParsed, err := url.Parse(issuer)
+	if err != nil {
+		return false
+	}
+	// Reject javascript:, data:, vbscript: schemes.
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return false
+	}
+	// Must match the issuer's host.
+	return strings.EqualFold(parsed.Host, issuerParsed.Host)
 }
 
 // completeLogin creates a session for the authenticated user and redirects

@@ -22,6 +22,7 @@ import (
 	"github.com/Monet/seki/internal/middleware"
 	"github.com/Monet/seki/internal/oidc"
 	"github.com/Monet/seki/internal/ratelimit"
+	"github.com/Monet/seki/internal/scim"
 	"github.com/Monet/seki/internal/session"
 	"github.com/Monet/seki/internal/storage"
 	"github.com/Monet/seki/internal/webhook"
@@ -123,6 +124,12 @@ func (s *Server) registerRoutes() {
 	if s.store != nil {
 		adminHandler := admin.NewHandler(s.store, s.cfg.Admin.APIKeys...)
 		adminHandler.RegisterRoutes(s.mux)
+	}
+
+	// SCIM 2.0 provisioning routes.
+	if s.store != nil {
+		scimHandler := scim.NewHandler(s.store, s.cfg.Server.Issuer, s.cfg.Admin.APIKeys...)
+		scimHandler.RegisterRoutes(s.mux)
 	}
 
 	// Admin UI (embedded SPA).

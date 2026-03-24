@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Monet/seki/internal/storage"
+	"github.com/Monet/seki/internal/validate"
 )
 
 // registerRoleRoutesOn registers role-related admin API routes on the given mux.
@@ -41,8 +42,8 @@ func (h *Handler) handleCreateRole(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.Name == "" {
-		writeProblem(w, http.StatusBadRequest, "name is required")
+	if err := validate.Name(req.Name); err != nil {
+		writeProblem(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if req.ID == "" {

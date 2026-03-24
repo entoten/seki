@@ -66,7 +66,7 @@ func (h *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	err := h.service.Register(r.Context(), userID, req.Password)
 	if err != nil {
-		if err == ErrPasswordTooShort {
+		if err == ErrPasswordTooShort || err == ErrPasswordTooLong {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
@@ -131,7 +131,7 @@ func (h *Handler) handleChange(w http.ResponseWriter, r *http.Request) {
 	err := h.service.ChangePassword(r.Context(), userID, req.OldPassword, req.NewPassword)
 	if err != nil {
 		switch err {
-		case ErrPasswordTooShort:
+		case ErrPasswordTooShort, ErrPasswordTooLong:
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		case ErrInvalidPassword:
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid old password"})

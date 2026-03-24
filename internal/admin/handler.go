@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/Monet/seki/internal/storage"
+	"github.com/Monet/seki/internal/validate"
 )
 
 // Handler serves the Admin REST API.
@@ -36,7 +37,16 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	h.registerSessionRoutesOn(api)
 	h.registerClientRoutesOn(api)
 
-	// Wrap with authentication and mount on the outer mux.
+	// Wrap with authentication + body size limit and mount on the outer mux.
 	authMiddleware := RequireAPIKey(h.apiKeys)
-	mux.Handle("/api/v1/", authMiddleware(api))
+	mux.Handle("/api/v1/", authMiddleware(limitRequestBody(api)))
+}
+
+// limitRequestBody wraps a handler to limit the size of request bodies,
+// preventing denial-of-service via oversized payloads.
+func limitRequestBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, int64(validate.MaxJSONBodyBytes))
+		next.ServeHTTP(w, r)
+	})
 }

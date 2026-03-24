@@ -3,6 +3,8 @@ package middleware
 import (
 	"net/http"
 	"strings"
+
+	"github.com/Monet/seki/internal/validate"
 )
 
 // tokenPaths lists path prefixes for token/auth endpoints that should
@@ -40,6 +42,12 @@ func SecurityHeaders() func(http.Handler) http.Handler {
 			if isTokenPath(path) {
 				w.Header().Set("Cache-Control", "no-store")
 				w.Header().Set("Pragma", "no-cache")
+			}
+
+			// Limit request body size on all POST/PUT/PATCH requests to
+			// prevent denial-of-service via oversized payloads.
+			if r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch {
+				r.Body = http.MaxBytesReader(w, r.Body, int64(validate.MaxJSONBodyBytes))
 			}
 
 			next.ServeHTTP(w, r)

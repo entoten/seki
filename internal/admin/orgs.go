@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Monet/seki/internal/storage"
+	"github.com/Monet/seki/internal/validate"
 )
 
 // registerOrgRoutesOn registers org-related admin API routes on the given mux.
@@ -42,12 +43,16 @@ func (h *Handler) handleCreateOrg(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.Slug == "" {
-		writeProblem(w, http.StatusBadRequest, "slug is required")
+	if err := validate.Slug(req.Slug); err != nil {
+		writeProblem(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if req.Name == "" {
-		writeProblem(w, http.StatusBadRequest, "name is required")
+	if err := validate.Name(req.Name); err != nil {
+		writeProblem(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validate.Metadata(req.Metadata); err != nil {
+		writeProblem(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if req.ID == "" {

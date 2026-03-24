@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"net/mail"
 	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/Monet/seki/internal/storage"
+	"github.com/Monet/seki/internal/validate"
 )
 
 // createUserRequest is the JSON body for POST /api/v1/users.
@@ -41,8 +41,16 @@ func (h *Handler) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isValidEmail(req.Email) {
-		writeProblem(w, http.StatusBadRequest, "invalid email format")
+	if err := validate.Email(req.Email); err != nil {
+		writeProblem(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validate.DisplayName(req.DisplayName); err != nil {
+		writeProblem(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validate.Metadata(req.Metadata); err != nil {
+		writeProblem(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -157,19 +165,27 @@ func (h *Handler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Email != nil {
-		if !isValidEmail(*req.Email) {
-			writeProblem(w, http.StatusBadRequest, "invalid email format")
+		if err := validate.Email(*req.Email); err != nil {
+			writeProblem(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		existing.Email = *req.Email
 	}
 	if req.DisplayName != nil {
+		if err := validate.DisplayName(*req.DisplayName); err != nil {
+			writeProblem(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		existing.DisplayName = *req.DisplayName
 	}
 	if req.Disabled != nil {
 		existing.Disabled = *req.Disabled
 	}
 	if req.Metadata != nil {
+		if err := validate.Metadata(*req.Metadata); err != nil {
+			writeProblem(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		existing.Metadata = *req.Metadata
 	}
 
@@ -204,12 +220,6 @@ func (h *Handler) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// isValidEmail checks if the string is a valid email address.
-func isValidEmail(email string) bool {
-	_, err := mail.ParseAddress(email)
-	return err == nil
 }
 
 // writeJSON writes a JSON response with the given status code.

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Monet/seki/internal/storage"
+	"github.com/Monet/seki/internal/validate"
 )
 
 // authCodeTTL is the lifetime of an authorization code.
@@ -46,8 +47,8 @@ func (p *Provider) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// --- Validate redirect_uri (MUST happen before we redirect errors) ---
-	if redirectURI == "" {
-		renderError(w, http.StatusBadRequest, "invalid_request", "missing redirect_uri parameter")
+	if err := validate.RedirectURI(redirectURI); err != nil {
+		renderError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 
