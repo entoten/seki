@@ -22,9 +22,19 @@ func (p *Provider) generateAccessToken(sub, clientID string, scopes []string, no
 // generateAccessTokenWithDPoP creates a signed JWT access token (RFC 9068 profile),
 // optionally binding it to a DPoP key.
 func (p *Provider) generateAccessTokenWithDPoP(sub, clientID string, scopes []string, now time.Time, dpopJKT string) (string, error) {
+	return p.generateAccessTokenFull(sub, clientID, "", scopes, now, dpopJKT)
+}
+
+// generateAccessTokenFull creates a signed JWT access token with all options,
+// including resource indicator support (RFC 8707).
+func (p *Provider) generateAccessTokenFull(sub, clientID, resource string, scopes []string, now time.Time, dpopJKT string) (string, error) {
+	aud := clientID
+	if resource != "" {
+		aud = resource
+	}
 	claims := map[string]interface{}{
 		"sub":       sub,
-		"aud":       clientID,
+		"aud":       aud,
 		"client_id": clientID,
 		"scope":     strings.Join(scopes, " "),
 		"iat":       now.Unix(),

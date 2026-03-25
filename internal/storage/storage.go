@@ -46,6 +46,7 @@ type UserStore interface {
 type ClientStore interface {
 	CreateClient(ctx context.Context, client *Client) error
 	GetClient(ctx context.Context, id string) (*Client, error)
+	UpdateClient(ctx context.Context, client *Client) error
 	ListClients(ctx context.Context) ([]*Client, error)
 	DeleteClient(ctx context.Context, id string) error
 }

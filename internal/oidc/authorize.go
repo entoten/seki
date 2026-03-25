@@ -46,6 +46,7 @@ func (p *Provider) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	nonce := q.Get("nonce")
 	codeChallenge := q.Get("code_challenge")
 	codeChallengeMethod := q.Get("code_challenge_method")
+	resource := q.Get("resource")
 
 	// --- Validate client_id ---
 	if clientID == "" {
@@ -61,6 +62,39 @@ func (p *Provider) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		}
 		renderError(w, http.StatusInternalServerError, "server_error", "failed to look up client")
 		return
+	}
+
+	// --- Check for JAR (RFC 9101) request parameter ---
+	if jarParams, handled := p.resolveJAR(w, r, client); handled {
+		if jarParams == nil {
+			// Error was already written.
+			return
+		}
+		// Merge: JWT claims take precedence over query params (except client_id).
+		if v, ok := jarParams["redirect_uri"]; ok {
+			redirectURI = v
+		}
+		if v, ok := jarParams["response_type"]; ok {
+			responseType = v
+		}
+		if v, ok := jarParams["scope"]; ok {
+			scope = v
+		}
+		if v, ok := jarParams["state"]; ok {
+			state = v
+		}
+		if v, ok := jarParams["nonce"]; ok {
+			nonce = v
+		}
+		if v, ok := jarParams["code_challenge"]; ok {
+			codeChallenge = v
+		}
+		if v, ok := jarParams["code_challenge_method"]; ok {
+			codeChallengeMethod = v
+		}
+		if v, ok := jarParams["resource"]; ok {
+			resource = v
+		}
 	}
 
 	// --- Validate redirect_uri (MUST happen before we redirect errors) ---
@@ -169,6 +203,7 @@ func (p *Provider) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		Nonce:               nonce,
 		State:               state,
 		ACR:                 acr,
+		Resource:            resource,
 		ExpiresAt:           now.Add(authCodeTTL),
 		CreatedAt:           now,
 	}

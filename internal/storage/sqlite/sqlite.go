@@ -248,6 +248,27 @@ func (s *Store) ListClients(ctx context.Context) ([]*storage.Client, error) {
 	return clients, rows.Err()
 }
 
+func (s *Store) UpdateClient(ctx context.Context, client *storage.Client) error {
+	redirects, _ := json.Marshal(client.RedirectURIs)
+	grants, _ := json.Marshal(client.GrantTypes)
+	scopes, _ := json.Marshal(client.Scopes)
+	meta := normalizeJSON(client.Metadata)
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE clients SET name = ?, secret_hash = ?, redirect_uris = ?, grant_types = ?, scopes = ?, pkce_required = ?, metadata = ?, updated_at = ?, jwks_uri = ?, token_endpoint_auth_method = ?, backchannel_logout_uri = ?, backchannel_logout_session_required = ?
+		 WHERE id = ?`,
+		client.Name, client.SecretHash,
+		string(redirects), string(grants), string(scopes),
+		boolToInt(client.PKCERequired), meta, timeStr(client.UpdatedAt),
+		client.JWKsURI, client.TokenEndpointAuthMethod,
+		client.BackChannelLogoutURI, boolToInt(client.BackChannelLogoutSessionReq),
+		client.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("sqlite: update client: %w", err)
+	}
+	return checkRowsAffected(res, "client")
+}
+
 func (s *Store) DeleteClient(ctx context.Context, id string) error {
 	res, err := s.db.ExecContext(ctx, `DELETE FROM clients WHERE id = ?`, id)
 	if err != nil {
@@ -479,11 +500,11 @@ func (s *Store) CountDistinctActorsByOrg(ctx context.Context, action string, fro
 func (s *Store) CreateAuthCode(ctx context.Context, code *storage.AuthCode) error {
 	scopes, _ := json.Marshal(code.Scopes)
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO authorization_codes (code, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, nonce, state, acr, expires_at, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO authorization_codes (code, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, nonce, state, acr, resource, expires_at, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		code.Code, code.ClientID, code.UserID, code.RedirectURI,
 		string(scopes), code.CodeChallenge, code.CodeChallengeMethod,
-		code.Nonce, code.State, code.ACR,
+		code.Nonce, code.State, code.ACR, code.Resource,
 		timeStr(code.ExpiresAt), timeStr(code.CreatedAt),
 	)
 	if err != nil {
@@ -497,12 +518,12 @@ func (s *Store) CreateAuthCode(ctx context.Context, code *storage.AuthCode) erro
 
 func (s *Store) GetAuthCode(ctx context.Context, code string) (*storage.AuthCode, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT code, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, nonce, state, acr, expires_at, created_at
+		`SELECT code, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, nonce, state, acr, resource, expires_at, created_at
 		 FROM authorization_codes WHERE code = ?`, code)
 	var ac storage.AuthCode
 	var scopes string
 	var expiresAt, createdAt string
-	err := row.Scan(&ac.Code, &ac.ClientID, &ac.UserID, &ac.RedirectURI, &scopes, &ac.CodeChallenge, &ac.CodeChallengeMethod, &ac.Nonce, &ac.State, &ac.ACR, &expiresAt, &createdAt)
+	err := row.Scan(&ac.Code, &ac.ClientID, &ac.UserID, &ac.RedirectURI, &scopes, &ac.CodeChallenge, &ac.CodeChallengeMethod, &ac.Nonce, &ac.State, &ac.ACR, &ac.Resource, &expiresAt, &createdAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, storage.ErrNotFound

@@ -134,12 +134,12 @@ func (p *Provider) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.R
 
 	now := time.Now().UTC()
 
-	// Generate access token (optionally DPoP-bound).
+	// Generate access token (optionally DPoP-bound, with resource indicator).
 	var dpopJKT string
 	if dpop.present {
 		dpopJKT = dpop.jkt
 	}
-	accessToken, err := p.generateAccessTokenWithDPoP(user.ID, client.ID, authCode.Scopes, now, dpopJKT)
+	accessToken, err := p.generateAccessTokenFull(user.ID, client.ID, authCode.Resource, authCode.Scopes, now, dpopJKT)
 	if err != nil {
 		tokenError(w, http.StatusInternalServerError, "server_error", "failed to generate access token")
 		return
@@ -212,12 +212,13 @@ func (p *Provider) handleClientCredentialsGrant(w http.ResponseWriter, r *http.R
 
 	scope := r.PostFormValue("scope")
 	scopes := parseScopes(scope)
+	resource := r.PostFormValue("resource")
 
 	var dpopJKT string
 	if dpop.present {
 		dpopJKT = dpop.jkt
 	}
-	accessToken, err := p.generateAccessTokenWithDPoP(client.ID, client.ID, scopes, now, dpopJKT)
+	accessToken, err := p.generateAccessTokenFull(client.ID, client.ID, resource, scopes, now, dpopJKT)
 	if err != nil {
 		tokenError(w, http.StatusInternalServerError, "server_error", "failed to generate access token")
 		return

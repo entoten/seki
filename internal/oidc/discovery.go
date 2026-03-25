@@ -33,6 +33,9 @@ func (p *Provider) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 		"authorization_response_iss_parameter_supported": true,
 		"backchannel_logout_supported":                   true,
 		"backchannel_logout_session_supported":           true,
+		"request_parameter_supported":                    true,
+		"registration_endpoint":                          issuer + "/register",
+		"resource_indicators_supported":                  true,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -62,6 +65,9 @@ func (p *Provider) handleOAuthASMetadata(w http.ResponseWriter, r *http.Request)
 		"pushed_authorization_request_endpoint":           issuer + "/par",
 		"require_pushed_authorization_requests":           false,
 		"authorization_response_iss_parameter_supported":  true,
+		"request_parameter_supported":                      true,
+		"registration_endpoint":                            issuer + "/register",
+		"resource_indicators_supported":                    true,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

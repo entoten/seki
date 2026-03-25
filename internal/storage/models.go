@@ -84,7 +84,8 @@ type AuthCode struct {
 	CodeChallengeMethod string    `json:"code_challenge_method"`
 	Nonce               string    `json:"nonce"`
 	State               string    `json:"state"`
-	ACR                 string    `json:"acr"` // achieved authentication context class
+	ACR                 string    `json:"acr"`      // achieved authentication context class
+	Resource            string    `json:"resource"` // RFC 8707 resource indicator
 	ExpiresAt           time.Time `json:"expires_at"`
 	CreatedAt           time.Time `json:"created_at"`
 }

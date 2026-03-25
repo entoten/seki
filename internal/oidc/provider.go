@@ -86,6 +86,10 @@ func (p *Provider) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /introspect", p.handleIntrospect)
 	mux.HandleFunc("POST /revoke", p.handleRevoke)
 
+	// Dynamic Client Registration (RFC 7591/7592).
+	mux.HandleFunc("/register", p.handleRegister)
+	mux.HandleFunc("/register/", p.handleRegister)
+
 	// Device authorization grant (RFC 8628).
 	p.RegisterDeviceRoutes(mux)
 }

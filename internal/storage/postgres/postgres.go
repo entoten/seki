@@ -258,6 +258,28 @@ func (s *Store) ListClients(ctx context.Context) ([]*storage.Client, error) {
 	return clients, rows.Err()
 }
 
+func (s *Store) UpdateClient(ctx context.Context, client *storage.Client) error {
+	redirects, _ := json.Marshal(client.RedirectURIs)
+	grants, _ := json.Marshal(client.GrantTypes)
+	scopes, _ := json.Marshal(client.Scopes)
+	meta := normalizeJSON(client.Metadata)
+	ct, err := s.pool.Exec(ctx,
+		`UPDATE clients SET name = $1, secret_hash = $2, redirect_uris = $3, grant_types = $4, scopes = $5, pkce_required = $6, metadata = $7, updated_at = $8
+		 WHERE id = $9`,
+		client.Name, client.SecretHash,
+		string(redirects), string(grants), string(scopes),
+		client.PKCERequired, meta, client.UpdatedAt.UTC(),
+		client.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("postgres: update client: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) DeleteClient(ctx context.Context, id string) error {
 	ct, err := s.pool.Exec(ctx, `DELETE FROM clients WHERE id = $1`, id)
 	if err != nil {
@@ -507,11 +529,11 @@ func (s *Store) CountDistinctActorsByOrg(ctx context.Context, action string, fro
 func (s *Store) CreateAuthCode(ctx context.Context, code *storage.AuthCode) error {
 	scopes, _ := json.Marshal(code.Scopes)
 	_, err := s.pool.Exec(ctx,
-		`INSERT INTO authorization_codes (code, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, nonce, state, acr, expires_at, created_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+		`INSERT INTO authorization_codes (code, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, nonce, state, acr, resource, expires_at, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 		code.Code, code.ClientID, code.UserID, code.RedirectURI,
 		string(scopes), code.CodeChallenge, code.CodeChallengeMethod,
-		code.Nonce, code.State, code.ACR,
+		code.Nonce, code.State, code.ACR, code.Resource,
 		code.ExpiresAt.UTC(), code.CreatedAt.UTC(),
 	)
 	if err != nil {
@@ -525,11 +547,11 @@ func (s *Store) CreateAuthCode(ctx context.Context, code *storage.AuthCode) erro
 
 func (s *Store) GetAuthCode(ctx context.Context, code string) (*storage.AuthCode, error) {
 	row := s.pool.QueryRow(ctx,
-		`SELECT code, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, nonce, state, acr, expires_at, created_at
+		`SELECT code, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, nonce, state, acr, resource, expires_at, created_at
 		 FROM authorization_codes WHERE code = $1`, code)
 	var ac storage.AuthCode
 	var scopes []byte
-	err := row.Scan(&ac.Code, &ac.ClientID, &ac.UserID, &ac.RedirectURI, &scopes, &ac.CodeChallenge, &ac.CodeChallengeMethod, &ac.Nonce, &ac.State, &ac.ACR, &ac.ExpiresAt, &ac.CreatedAt)
+	err := row.Scan(&ac.Code, &ac.ClientID, &ac.UserID, &ac.RedirectURI, &scopes, &ac.CodeChallenge, &ac.CodeChallengeMethod, &ac.Nonce, &ac.State, &ac.ACR, &ac.Resource, &ac.ExpiresAt, &ac.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, storage.ErrNotFound
