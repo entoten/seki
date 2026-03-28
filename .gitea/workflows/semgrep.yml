@@ -1,0 +1,49 @@
+name: Semgrep 静的解析
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      # ソースコードを取得する
+      - name: コードをチェックアウト
+        uses: actions/checkout@v4
+
+      # Semgrep の OSS ルールを auto 設定で適用する
+      - name: Semgrep を実行
+        run: |
+          echo "Semgrep による静的解析を開始します"
+          mkdir -p artifacts
+          docker run --rm \
+            -v "$PWD:/src" \
+            semgrep/semgrep \
+            semgrep scan \
+            --config auto \
+            --json \
+            --output /src/artifacts/semgrep-report.json \
+            /src || true
+          echo "Semgrep 解析が完了しました"
+
+      # DefectDojo の接続情報がある場合は、そのまま結果を取り込む
+      - name: DefectDojo へ Semgrep 結果を送信
+        if: ${{ secrets.DEFECTDOJO_URL != '' && secrets.DEFECTDOJO_API_KEY != '' && secrets.DEFECTDOJO_ENGAGEMENT_ID != '' }}
+        env:
+          DEFECTDOJO_URL: ${{ secrets.DEFECTDOJO_URL }}
+          DEFECTDOJO_API_KEY: ${{ secrets.DEFECTDOJO_API_KEY }}
+          DEFECTDOJO_ENGAGEMENT_ID: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
+          SCAN_TYPE: Semgrep JSON Report
+          REPORT_FILE: artifacts/semgrep-report.json
+        run: |
+          echo "DefectDojo へ Semgrep 結果を送信します"
+          bash scripts/upload-to-defectdojo.sh || true
+
+      # JSON レポートをアーティファクトとして保存する
+      - name: 生成物を確認
+        run: |
+          echo "Gitea Actions では upload-artifact が不安定なため、生成物一覧のみ出力します"
+          ls -lah artifacts || true
+

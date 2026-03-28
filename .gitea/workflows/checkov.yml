@@ -1,0 +1,50 @@
+name: Checkov IaC スキャン
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checkov:
+    runs-on: ubuntu-latest
+    steps:
+      # IaC 定義をスキャンするためにコードを取得する
+      - name: コードをチェックアウト
+        uses: actions/checkout@v4
+
+      # Terraform / Dockerfile / Kubernetes を対象に Checkov を実行する
+      - name: Checkov を実行
+        run: |
+          echo "Checkov による IaC スキャンを開始します"
+          mkdir -p artifacts
+          docker run --rm \
+            -v "$PWD:/work" \
+            bridgecrew/checkov:latest \
+            --directory /work \
+            --framework terraform,dockerfile,kubernetes \
+            --output json \
+            --output-file-path /work/artifacts/checkov-report.json \
+            --soft-fail || true
+          test -f artifacts/checkov-report.json || echo '[]' > artifacts/checkov-report.json
+          echo "Checkov スキャンが完了しました"
+
+      # DefectDojo の接続情報がある場合は、そのまま結果を取り込む
+      - name: DefectDojo へ Checkov 結果を送信
+        if: ${{ secrets.DEFECTDOJO_URL != '' && secrets.DEFECTDOJO_API_KEY != '' && secrets.DEFECTDOJO_ENGAGEMENT_ID != '' }}
+        env:
+          DEFECTDOJO_URL: ${{ secrets.DEFECTDOJO_URL }}
+          DEFECTDOJO_API_KEY: ${{ secrets.DEFECTDOJO_API_KEY }}
+          DEFECTDOJO_ENGAGEMENT_ID: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
+          SCAN_TYPE: Checkov Scan
+          REPORT_FILE: artifacts/checkov-report.json
+        run: |
+          echo "DefectDojo へ Checkov 結果を送信します"
+          bash scripts/upload-to-defectdojo.sh || true
+
+      # スキャン結果をアーティファクトに残す
+      - name: 生成物を確認
+        run: |
+          echo "Gitea Actions では upload-artifact が不安定なため、生成物一覧のみ出力します"
+          ls -lah artifacts || true
+

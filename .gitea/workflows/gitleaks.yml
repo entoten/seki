@@ -1,0 +1,56 @@
+name: Gitleaks シークレットスキャン
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      # リポジトリの履歴を含めて取得する
+      - name: コードをチェックアウト
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Gitleaks で git 履歴全体を JSON レポート付きで走査する
+      - name: Gitleaks を実行
+        run: |
+          echo "Gitleaks によるシークレットスキャンを開始します"
+          mkdir -p artifacts
+          docker run --rm \
+            -e GIT_DISCOVERY_ACROSS_FILESYSTEM=1 \
+            -w /work \
+            -v "$PWD:/work" \
+            zricethezav/gitleaks:latest \
+            detect \
+            --source /work \
+            --report-path /work/artifacts/gitleaks-report.json \
+            --report-format json \
+            --redact \
+            --no-banner \
+            --exit-code 0 || true
+          test -f artifacts/gitleaks-report.json || echo '[]' > artifacts/gitleaks-report.json
+          echo "Gitleaks スキャンが完了しました"
+
+      # DefectDojo の接続情報がある場合は、そのまま結果を取り込む
+      - name: DefectDojo へ Gitleaks 結果を送信
+        if: ${{ secrets.DEFECTDOJO_URL != '' && secrets.DEFECTDOJO_API_KEY != '' && secrets.DEFECTDOJO_ENGAGEMENT_ID != '' }}
+        env:
+          DEFECTDOJO_URL: ${{ secrets.DEFECTDOJO_URL }}
+          DEFECTDOJO_API_KEY: ${{ secrets.DEFECTDOJO_API_KEY }}
+          DEFECTDOJO_ENGAGEMENT_ID: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
+          SCAN_TYPE: Gitleaks Scan
+          REPORT_FILE: artifacts/gitleaks-report.json
+        run: |
+          echo "DefectDojo へ Gitleaks 結果を送信します"
+          bash scripts/upload-to-defectdojo.sh || true
+
+      # スキャン結果を後で参照できるように保存する
+      - name: 生成物を確認
+        run: |
+          echo "Gitea Actions では upload-artifact が不安定なため、生成物一覧のみ出力します"
+          ls -lah artifacts || true
+

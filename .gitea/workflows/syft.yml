@@ -1,0 +1,57 @@
+name: Syft SBOM 生成
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  syft:
+    runs-on: ubuntu-latest
+    steps:
+      # ソースと Dockerfile からイメージをビルドする前提のためコードを取得する
+      - name: コードをチェックアウト
+        uses: actions/checkout@v4
+
+      # Dockerfile がある場合はイメージ SBOM、ない場合はソース SBOM を生成する
+      - name: Syft を実行
+        run: |
+          echo "Syft による SBOM 生成を開始します"
+          mkdir -p artifacts
+          if [ -f Dockerfile ]; then
+            echo "Dockerfile を検出したため、コンテナイメージをビルドして SBOM を生成します"
+            docker build -t local/security-scan-target:${{ gitea.sha || github.sha }} . || true
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$PWD/artifacts:/artifacts" \
+              anchore/syft:latest \
+              local/security-scan-target:${{ gitea.sha || github.sha }} \
+              -o cyclonedx-json=/artifacts/sbom.cyclonedx.json || true
+          else
+            echo "Dockerfile がないため、ソースツリーから SBOM を生成します"
+            docker run --rm \
+              -v "$PWD:/work" \
+              anchore/syft:latest dir:/work \
+              -o cyclonedx-json=/work/artifacts/sbom.cyclonedx.json || true
+          fi
+          echo "Syft による SBOM 生成が完了しました"
+
+      # DefectDojo の接続情報がある場合は、そのまま結果を取り込む
+      - name: DefectDojo へ SBOM を送信
+        if: ${{ secrets.DEFECTDOJO_URL != '' && secrets.DEFECTDOJO_API_KEY != '' && secrets.DEFECTDOJO_ENGAGEMENT_ID != '' }}
+        env:
+          DEFECTDOJO_URL: ${{ secrets.DEFECTDOJO_URL }}
+          DEFECTDOJO_API_KEY: ${{ secrets.DEFECTDOJO_API_KEY }}
+          DEFECTDOJO_ENGAGEMENT_ID: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
+          SCAN_TYPE: CycloneDX Scan
+          REPORT_FILE: artifacts/sbom.cyclonedx.json
+        run: |
+          echo "DefectDojo へ SBOM を送信します"
+          bash scripts/upload-to-defectdojo.sh || true
+
+      # 生成した SBOM を保存する
+      - name: 生成物を確認
+        run: |
+          echo "Gitea Actions では upload-artifact が不安定なため、生成物一覧のみ出力します"
+          ls -lah artifacts || true
+

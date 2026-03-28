@@ -1,0 +1,48 @@
+name: Trivy 脆弱性スキャン
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      # ソースをチェックアウトする
+      - name: コードをチェックアウト
+        uses: actions/checkout@v4
+
+      # Trivy でファイルシステムをスキャンして JSON レポートを作る
+      - name: Trivy を実行
+        run: |
+          echo "Trivy による脆弱性スキャンを開始します"
+          mkdir -p artifacts
+          docker run --rm \
+            -v "$PWD:/work" \
+            aquasec/trivy:latest \
+            fs /work \
+            --format json \
+            --output /work/artifacts/trivy-report.json || true
+          test -f artifacts/trivy-report.json || echo '{}' > artifacts/trivy-report.json
+          echo "Trivy スキャンが完了しました"
+
+      # DefectDojo の接続情報がある場合は、そのまま結果を取り込む
+      - name: DefectDojo へ Trivy 結果を送信
+        if: ${{ secrets.DEFECTDOJO_URL != '' && secrets.DEFECTDOJO_API_KEY != '' && secrets.DEFECTDOJO_ENGAGEMENT_ID != '' }}
+        env:
+          DEFECTDOJO_URL: ${{ secrets.DEFECTDOJO_URL }}
+          DEFECTDOJO_API_KEY: ${{ secrets.DEFECTDOJO_API_KEY }}
+          DEFECTDOJO_ENGAGEMENT_ID: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
+          SCAN_TYPE: Trivy Scan
+          REPORT_FILE: artifacts/trivy-report.json
+        run: |
+          echo "DefectDojo へ Trivy 結果を送信します"
+          bash scripts/upload-to-defectdojo.sh || true
+
+      # 生成物確認
+      - name: 生成物を確認
+        run: |
+          echo "生成されたレポートを確認します"
+          ls -lah artifacts || true
+
