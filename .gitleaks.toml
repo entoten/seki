@@ -1,0 +1,12 @@
+# Gitleaks configuration for seki
+# Exclude known false positives
+
+[allowlist]
+  description = "seki allowlist"
+  paths = [
+    '''docs/.*\.md$''',        # Documentation with example commands
+    '''talk/.*\.md$''',        # Internal discussion logs
+    '''.*_test\.go$''',        # Test files with dummy keys
+    '''benchmarks/.*''',       # Benchmark scripts
+    '''sdks/.*'''              # SDK examples
+  ]
