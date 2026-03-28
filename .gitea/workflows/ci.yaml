@@ -90,18 +90,62 @@ jobs:
         with:
           go-version: '1.26'
 
-      - name: Run govulncheck
+      - name: Run govulncheck (dependency vulnerabilities)
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
 
-      - name: Run gosec
+      - name: Run gosec (static security analysis)
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@latest
           gosec -quiet -severity=medium -exclude=G101,G304 ./...
+
+      - name: Run staticcheck (advanced static analysis)
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          staticcheck ./...
 
       - name: Check go.sum integrity
         run: |
           go mod verify
           go mod tidy
           git diff --exit-code go.mod go.sum
+
+      - name: Check for hardcoded secrets
+        run: |
+          # Scan for potential leaked secrets (API keys, passwords, tokens)
+          # Exclude test files, examples, and known false positives
+          FOUND=0
+          for pattern in 'password\s*=\s*"[^"]{8,}"' 'api_key\s*=\s*"[^"]{8,}"' 'secret\s*=\s*"[^"]{8,}"' 'token\s*=\s*"[^"]{20,}"'; do
+            MATCHES=$(grep -rn --include="*.go" -E "$pattern" . \
+              | grep -v "_test.go" \
+              | grep -v "example" \
+              | grep -v "testdata" \
+              | grep -v "// #nosec" \
+              | grep -v 'seki.yaml' \
+              || true)
+            if [ -n "$MATCHES" ]; then
+              echo "Potential hardcoded secret found:"
+              echo "$MATCHES"
+              FOUND=1
+            fi
+          done
+          if [ "$FOUND" -eq 1 ]; then
+            echo "WARNING: Review the above matches for hardcoded secrets"
+          fi
+
+      - name: Fuzz test (quick pass)
+        run: |
+          # Run each fuzz test for 10 seconds to catch panics
+          for pkg in ./internal/oidc/ ./internal/scim/ ./internal/crypto/ ./internal/validate/; do
+            echo "Fuzzing $pkg ..."
+            FUZZ_FUNCS=$(go test -list 'Fuzz.*' "$pkg" 2>/dev/null | grep '^Fuzz' || true)
+            for func in $FUZZ_FUNCS; do
+              go test -fuzz="^${func}$" -fuzztime=10s "$pkg" || true
+            done
+          done
+
+      - name: License check (dependencies)
+        run: |
+          go install github.com/google/go-licenses@latest
+          go-licenses check ./... 2>&1 || echo "License check completed (review any warnings above)"

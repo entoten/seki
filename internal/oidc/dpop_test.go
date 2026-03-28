@@ -97,16 +97,13 @@ func createDPoPProof(t *testing.T, key *ecdsa.PrivateKey, method, uri string, op
 	t.Helper()
 
 	// Build JWK for the public key.
-	pub := key.PublicKey
-	xBytes := pub.X.Bytes()
-	yBytes := pub.Y.Bytes()
-	// Pad to 32 bytes for P-256.
-	for len(xBytes) < 32 {
-		xBytes = append([]byte{0}, xBytes...)
+	// Uncompressed point: 0x04 || X (32 bytes) || Y (32 bytes) for P-256.
+	pubBytes, err := key.PublicKey.Bytes()
+	if err != nil {
+		t.Fatalf("PublicKey.Bytes: %v", err)
 	}
-	for len(yBytes) < 32 {
-		yBytes = append([]byte{0}, yBytes...)
-	}
+	xBytes := pubBytes[1:33]
+	yBytes := pubBytes[33:65]
 
 	jwk := map[string]interface{}{
 		"kty": "EC",
@@ -550,15 +547,13 @@ func TestDPoP_WrongHTM_Rejected(t *testing.T) {
 // computeExpectedJKT computes the expected JWK thumbprint for an EC P-256 key.
 func computeExpectedJKT(t *testing.T, key *ecdsa.PrivateKey) string {
 	t.Helper()
-	pub := key.PublicKey
-	xBytes := pub.X.Bytes()
-	yBytes := pub.Y.Bytes()
-	for len(xBytes) < 32 {
-		xBytes = append([]byte{0}, xBytes...)
+	// Uncompressed point: 0x04 || X (32 bytes) || Y (32 bytes) for P-256.
+	pubBytes, err := key.PublicKey.Bytes()
+	if err != nil {
+		t.Fatalf("PublicKey.Bytes: %v", err)
 	}
-	for len(yBytes) < 32 {
-		yBytes = append([]byte{0}, yBytes...)
-	}
+	xBytes := pubBytes[1:33]
+	yBytes := pubBytes[33:65]
 
 	canonical, err := json.Marshal(map[string]interface{}{
 		"crv": "P-256",

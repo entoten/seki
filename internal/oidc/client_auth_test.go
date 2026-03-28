@@ -225,15 +225,13 @@ func TestPrivateKeyJWT_ES256(t *testing.T) {
 	}
 
 	// Build JWKS with the EC public key.
-	xBytes := ecPriv.PublicKey.X.Bytes()
-	yBytes := ecPriv.PublicKey.Y.Bytes()
-	// Pad to 32 bytes for P-256.
-	for len(xBytes) < 32 {
-		xBytes = append([]byte{0}, xBytes...)
+	// Uncompressed point: 0x04 || X (32 bytes) || Y (32 bytes) for P-256.
+	pubBytes, err := ecPriv.PublicKey.Bytes()
+	if err != nil {
+		t.Fatalf("PublicKey.Bytes: %v", err)
 	}
-	for len(yBytes) < 32 {
-		yBytes = append([]byte{0}, yBytes...)
-	}
+	xBytes := pubBytes[1:33]
+	yBytes := pubBytes[33:65]
 
 	jwks := map[string]interface{}{
 		"keys": []map[string]interface{}{

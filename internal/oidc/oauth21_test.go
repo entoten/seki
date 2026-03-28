@@ -3,7 +3,6 @@ package oidc_test
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
@@ -576,8 +575,3 @@ func sha256Hex(s string) string {
 	return hex.EncodeToString(h[:])
 }
 
-// Ensure computeS256Challenge is available (same logic as token_test.go).
-func oauth21ComputeS256Challenge(verifier string) string {
-	h := sha256.Sum256([]byte(verifier))
-	return base64.RawURLEncoding.EncodeToString(h[:])
-}
