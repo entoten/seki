@@ -1,0 +1,3 @@
+# Semgrep ignore patterns for seki
+# Go templates are not Django — CSRF rules are false positives
+web/login/templates/
